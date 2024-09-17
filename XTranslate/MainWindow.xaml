@@ -6,10 +6,15 @@
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
         xmlns:local="clr-namespace:XTranslate"
         mc:Ignorable="d"
-        Title="Xtranslate" Height="450" Width="800">
+        Title="Xtranslate" Height="450" Width="800" Closing="Window_Closing">
     <Grid>
         <Label Content="... To ..." HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top"/>
-        <TextBox HorizontalAlignment="Center" TextWrapping="Wrap" Text="TextBlock" VerticalAlignment="Top" Width="780" Height="148" Margin="0,53,0,0"/>
+        <AdornerDecorator>
+            <Grid>
+                <TextBox Name="textBox" HorizontalAlignment="Center" TextWrapping="Wrap" Text="TextBlock" VerticalAlignment="Top" Width="780" Height="148" Margin="0,53,0,0"/>
+                
+            </Grid>
+        </AdornerDecorator>
         <TextBox HorizontalAlignment="Center" TextWrapping="Wrap" Text="TextBlock" VerticalAlignment="Top" Width="780" Height="187" Margin="0,237,0,0"/>
 
         <Button Name="btOption" Content="Option" Margin="715,10,10,380">
