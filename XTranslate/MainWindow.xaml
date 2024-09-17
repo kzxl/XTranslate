@@ -3,33 +3,40 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
         xmlns:local="clr-namespace:XTranslate"
         mc:Ignorable="d"
         Title="Xtranslate" Height="450" Width="800">
     <Grid>
-        <Border BorderThickness="1"
-                BorderBrush="Black"
-                Background="LightGray"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Top"
-                Width="780"
-                Height="165" Margin="0,41,0,0">
-            <Canvas>
-                <TextBlock HorizontalAlignment="Center" TextWrapping="Wrap" Text="TextBlock" VerticalAlignment="Top" Width="752" Height="96"/>
-            </Canvas>
-        </Border>
         <Label Content="... To ..." HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top"/>
-        <Border BorderThickness="1"
-                BorderBrush="Black"
-                Background="LightGray"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Top"
-                Width="780"
-                Height="189" Margin="0,235,0,0">
-            <Canvas>
-                <TextBlock HorizontalAlignment="Center" TextWrapping="Wrap" Text="TextBlock" VerticalAlignment="Top" Width="780" Height="187"/>
-            </Canvas>
-        </Border>
+        <TextBox HorizontalAlignment="Center" TextWrapping="Wrap" Text="TextBlock" VerticalAlignment="Top" Width="780" Height="148" Margin="0,53,0,0"/>
+        <TextBox HorizontalAlignment="Center" TextWrapping="Wrap" Text="TextBlock" VerticalAlignment="Top" Width="780" Height="187" Margin="0,237,0,0"/>
+
+        <Button Name="btOption" Content="Option" Margin="715,10,10,380">
+            <Button.ContextMenu>
+                <ContextMenu x:Name="MainContextMenu" PlacementRectangle="{Binding RelativeSource={RelativeSource Self}}">
+                    <MenuItem Header="Option" />
+                    <MenuItem Header="About" />
+                    <Separator/>
+                    <MenuItem Header="Exit" />
+                </ContextMenu>
+            </Button.ContextMenu>
+            <Button.Triggers>
+                <EventTrigger SourceName="btOption" RoutedEvent="Button.Click">
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="MainContextMenu" Storyboard.TargetProperty="(ContextMenu.IsOpen)">
+                                <DiscreteObjectKeyFrame KeyTime="0:0:0">
+                                    <DiscreteObjectKeyFrame.Value>
+                                        <sys:Boolean>True</sys:Boolean>
+                                    </DiscreteObjectKeyFrame.Value>
+                                </DiscreteObjectKeyFrame>
+                            </ObjectAnimationUsingKeyFrames>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </EventTrigger>
+            </Button.Triggers>
+        </Button>
 
     </Grid>
 </Window>
