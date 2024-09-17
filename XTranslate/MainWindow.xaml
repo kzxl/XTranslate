@@ -5,8 +5,31 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:XTranslate"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="Xtranslate" Height="450" Width="800">
     <Grid>
+        <Border BorderThickness="1"
+                BorderBrush="Black"
+                Background="LightGray"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Width="780"
+                Height="165" Margin="0,41,0,0">
+            <Canvas>
+                <TextBlock HorizontalAlignment="Center" TextWrapping="Wrap" Text="TextBlock" VerticalAlignment="Top" Width="752" Height="96"/>
+            </Canvas>
+        </Border>
+        <Label Content="... To ..." HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top"/>
+        <Border BorderThickness="1"
+                BorderBrush="Black"
+                Background="LightGray"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Width="780"
+                Height="189" Margin="0,235,0,0">
+            <Canvas>
+                <TextBlock HorizontalAlignment="Center" TextWrapping="Wrap" Text="TextBlock" VerticalAlignment="Top" Width="780" Height="187"/>
+            </Canvas>
+        </Border>
 
     </Grid>
 </Window>
