@@ -8,3 +8,5 @@ global using Window = System.Windows.Window;
 global using WindowState = System.Windows.WindowState;
 global using WindowStyle = System.Windows.WindowStyle;
 global using Visibility = System.Windows.Visibility;
+global using Color = System.Windows.Media.Color;
+global using SolidColorBrush = System.Windows.Media.SolidColorBrush;

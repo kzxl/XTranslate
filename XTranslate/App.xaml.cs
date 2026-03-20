@@ -16,16 +16,18 @@ public partial class App : Application
 
     // --- Services ---
     public SettingsService SettingsService { get; private set; } = null!;
+    public TranslationEngineRegistry EngineRegistry { get; private set; } = null!;
     public TranslationService TranslationService { get; private set; } = null!;
     public HotkeyService HotkeyService { get; private set; } = null!;
     public ClipboardService ClipboardService { get; private set; } = null!;
+    public TextSelectionMonitor TextSelectionMonitor { get; private set; } = null!;
 
     public AppSettings Settings => SettingsService.Settings;
 
-    // --- System Tray ---
+    // --- UI ---
     private System.Windows.Forms.NotifyIcon? _trayIcon;
-
     private MainWindow? _mainWindow;
+    private FloatingIconWindow? _floatingIcon;
 
     public App()
     {
@@ -38,14 +40,29 @@ public partial class App : Application
         SettingsService = new SettingsService();
         SettingsService.Load();
 
-        var engine = new GoogleTranslateEngine();
-        TranslationService = new TranslationService(engine);
+        // Engine registry — add new engines here
+        EngineRegistry = new TranslationEngineRegistry();
+        EngineRegistry.Register(new GoogleTranslateEngine());
+        // Future: EngineRegistry.Register(new BingTranslateEngine());
+        // Future: EngineRegistry.Register(new DeepLTranslateEngine());
+
+        TranslationService = new TranslationService(EngineRegistry);
         ClipboardService = new ClipboardService();
         HotkeyService = new HotkeyService();
 
         // Create main window
         var mainViewModel = new MainViewModel(TranslationService);
         _mainWindow = new MainWindow(mainViewModel);
+
+        // Setup floating icon
+        _floatingIcon = new FloatingIconWindow();
+        _floatingIcon.TranslateRequested += OnFloatingIconTranslateRequested;
+
+        // Setup text selection monitor
+        TextSelectionMonitor = new TextSelectionMonitor();
+        TextSelectionMonitor.TextSelected += OnTextSelected;
+        TextSelectionMonitor.SelectionCleared += OnSelectionCleared;
+        TextSelectionMonitor.Start();
 
         // Setup system tray
         SetupSystemTray();
@@ -59,6 +76,31 @@ public partial class App : Application
             _mainWindow.Show();
         }
     }
+
+    // --- Text Selection → Floating Icon ---
+
+    private void OnTextSelected(string text, int x, int y)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _floatingIcon?.ShowAt(x, y, text);
+        });
+    }
+
+    private void OnSelectionCleared()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            _floatingIcon?.HideIcon();
+        });
+    }
+
+    private async void OnFloatingIconTranslateRequested(string text)
+    {
+        await ShowTranslationPopup(text);
+    }
+
+    // --- System Tray ---
 
     private void SetupSystemTray()
     {
@@ -105,15 +147,17 @@ public partial class App : Application
         return menu;
     }
 
+    // --- Global Hotkey ---
+
     private void SetupHotkey()
     {
         HotkeyService.HotkeyPressed += OnTranslateHotkeyPressed;
 
         if (!HotkeyService.RegisterHotkey(Settings.TranslateHotkey))
         {
-            MessageBox.Show(
-                $"Không thể đăng ký phím tắt Ctrl+Q.\nCó thể phím tắt đã được sử dụng bởi ứng dụng khác.",
-                "XTranslate", MessageBoxButton.OK, MessageBoxImage.Warning);
+            System.Windows.MessageBox.Show(
+                "Không thể đăng ký phím tắt Ctrl+Q.\nCó thể phím tắt đã được sử dụng bởi ứng dụng khác.",
+                "XTranslate", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
         }
     }
 
@@ -121,42 +165,53 @@ public partial class App : Application
     {
         try
         {
-            // Get selected text from foreground application
+            // Disable text selection monitor briefly to avoid interference
+            TextSelectionMonitor.IsEnabled = false;
+            _floatingIcon?.HideIcon();
+
             var selectedText = await ClipboardService.GetSelectedTextAsync();
 
-            if (string.IsNullOrWhiteSpace(selectedText))
-                return;
+            TextSelectionMonitor.IsEnabled = true;
 
-            // Create popup
-            await Dispatcher.InvokeAsync(async () =>
+            if (!string.IsNullOrWhiteSpace(selectedText))
             {
-                var popupVm = new PopupViewModel(TranslationService);
-                var popup = new PopupWindow(popupVm);
-                popup.Show();
-
-                // Start translation
-                await popupVm.TranslateAsync(selectedText, Settings.DefaultTargetLanguage);
-            });
+                await ShowTranslationPopup(selectedText);
+            }
         }
         catch
         {
-            // Silently fail — hotkey popup is non-critical
+            TextSelectionMonitor.IsEnabled = true;
         }
     }
+
+    private async Task ShowTranslationPopup(string text)
+    {
+        await Dispatcher.InvokeAsync(async () =>
+        {
+            var popupVm = new PopupViewModel(TranslationService);
+            var popup = new PopupWindow(popupVm);
+            popup.Show();
+            await popupVm.TranslateAsync(text, Settings.DefaultTargetLanguage);
+        });
+    }
+
+    // --- Window Management ---
 
     private void ShowMainWindow()
     {
         if (_mainWindow != null)
         {
             _mainWindow.Show();
-            _mainWindow.WindowState = WindowState.Normal;
+            _mainWindow.WindowState = System.Windows.WindowState.Normal;
             _mainWindow.Activate();
         }
     }
 
     private void ExitApplication()
     {
+        TextSelectionMonitor?.Dispose();
         HotkeyService?.Dispose();
+        _floatingIcon?.Close();
         _trayIcon?.Dispose();
         _mainWindow?.Close();
         Shutdown();
@@ -164,6 +219,7 @@ public partial class App : Application
 
     private void Application_Exit(object sender, ExitEventArgs e)
     {
+        TextSelectionMonitor?.Dispose();
         HotkeyService?.Dispose();
         _trayIcon?.Dispose();
         SettingsService?.Save();

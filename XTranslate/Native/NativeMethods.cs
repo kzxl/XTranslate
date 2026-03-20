@@ -75,4 +75,24 @@ internal static partial class NativeMethods
 
     // --- Window Messages ---
     public const int WM_HOTKEY = 0x0312;
+    public const int WM_LBUTTONDOWN = 0x0201;
+    public const int WM_LBUTTONUP = 0x0202;
+
+    // --- Low-level Mouse Hook ---
+    public const int WH_MOUSE_LL = 14;
+
+    public delegate IntPtr LowLevelMouseProc(int nCode, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr SetWindowsHookEx(int idHook, LowLevelMouseProc lpfn, IntPtr hMod, uint dwThreadId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool UnhookWindowsHookEx(IntPtr hhk);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr GetModuleHandle(string lpModuleName);
 }
