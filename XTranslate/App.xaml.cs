@@ -90,7 +90,21 @@ public partial class App : Application
                 Dispatcher.Invoke(() => _floatingIcon?.ShowAt(x, y, text.Trim()));
             }
         };
-        TextSelectionMonitor.SelectionCleared += () => Dispatcher.Invoke(() => _floatingIcon?.HideIcon());
+        TextSelectionMonitor.SelectionCleared += () => Dispatcher.InvokeAsync(() => 
+        {
+            // Bypass hiding if the user is clicking exactly on the floating icon
+            if (_floatingIcon != null && _floatingIcon.Visibility == System.Windows.Visibility.Visible)
+            {
+                XTranslate.Native.NativeMethods.GetCursorPos(out var p);
+                if (p.X >= _floatingIcon.Left - 5 && p.X <= _floatingIcon.Left + _floatingIcon.Width + 5 &&
+                    p.Y >= _floatingIcon.Top - 5 && p.Y <= _floatingIcon.Top + _floatingIcon.Height + 5)
+                {
+                    return; 
+                }
+            }
+            _floatingIcon?.HideIcon();
+        }, System.Windows.Threading.DispatcherPriority.Input);
+        
         TextSelectionMonitor.Start();
     }
 

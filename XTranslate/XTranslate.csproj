@@ -11,6 +11,11 @@
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <AssemblyName>XTranslate</AssemblyName>
     <RootNamespace>XTranslate</RootNamespace>
+
+    <!-- Performance Optimizations -->
+    <TieredCompilation>true</TieredCompilation>
+    <TieredPGO>true</TieredPGO>
+    <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>
