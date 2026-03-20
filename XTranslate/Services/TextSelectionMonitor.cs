@@ -6,28 +6,34 @@ using XTranslate.Native;
 namespace XTranslate.Services;
 
 /// <summary>
-/// Monitors mouse activity to detect text selection across all applications.
-/// When a mouse-up is detected after a drag, checks clipboard for selected text
-/// and fires TextSelected event to show a floating translate icon.
+/// Monitors mouse activity to detect text selection.
+/// When mouse-up after drag detected, shows floating icon at cursor position.
+/// Does NOT capture clipboard — that happens only when user clicks the icon.
 /// </summary>
 public class TextSelectionMonitor : IDisposable
 {
-    public event Action<string, int, int>? TextSelected; // text, cursorX, cursorY
+    /// <summary>Fired when user potentially selected text (mouse up after drag).</summary>
+    public event Action<int, int>? PossibleSelection; // cursorX, cursorY
+
+    /// <summary>Fired when selection is likely cleared (click without drag).</summary>
     public event Action? SelectionCleared;
 
     private IntPtr _mouseHookId = IntPtr.Zero;
     private NativeMethods.LowLevelMouseProc? _mouseProc;
     private bool _isMouseDown;
+    private NativeMethods.POINT _mouseDownPoint;
     private readonly DispatcherTimer _debounceTimer;
     private bool _disposed;
 
     public bool IsEnabled { get; set; } = true;
 
+    private const int MinDragDistance = 10; // pixels — must drag at least this far
+
     public TextSelectionMonitor()
     {
         _debounceTimer = new DispatcherTimer
         {
-            Interval = TimeSpan.FromMilliseconds(300)
+            Interval = TimeSpan.FromMilliseconds(200)
         };
         _debounceTimer.Tick += OnDebounceTimerTick;
     }
@@ -38,6 +44,7 @@ public class TextSelectionMonitor : IDisposable
 
         _mouseProc = MouseHookCallback;
         _mouseHookId = SetMouseHook(_mouseProc);
+        Debug.WriteLine($"[XTranslate] TextSelectionMonitor started. Hook={_mouseHookId}");
     }
 
     public void Stop()
@@ -67,45 +74,43 @@ public class TextSelectionMonitor : IDisposable
             if (msg == NativeMethods.WM_LBUTTONDOWN)
             {
                 _isMouseDown = true;
+                NativeMethods.GetCursorPos(out _mouseDownPoint);
                 _debounceTimer.Stop();
                 SelectionCleared?.Invoke();
             }
             else if (msg == NativeMethods.WM_LBUTTONUP && _isMouseDown)
             {
                 _isMouseDown = false;
-                // Debounce: wait a moment before checking selection
-                _debounceTimer.Stop();
-                _debounceTimer.Start();
+
+                // Check if mouse moved enough (was it a drag or just a click?)
+                if (NativeMethods.GetCursorPos(out var upPoint))
+                {
+                    int dx = Math.Abs(upPoint.X - _mouseDownPoint.X);
+                    int dy = Math.Abs(upPoint.Y - _mouseDownPoint.Y);
+
+                    if (dx > MinDragDistance || dy > MinDragDistance)
+                    {
+                        // Likely text selection — debounce
+                        _debounceTimer.Stop();
+                        _debounceTimer.Start();
+                    }
+                }
             }
         }
 
         return NativeMethods.CallNextHookEx(_mouseHookId, nCode, wParam, lParam);
     }
 
-    private async void OnDebounceTimerTick(object? sender, EventArgs e)
+    private void OnDebounceTimerTick(object? sender, EventArgs e)
     {
         _debounceTimer.Stop();
 
         if (!IsEnabled) return;
 
-        try
+        if (NativeMethods.GetCursorPos(out var point))
         {
-            // Get cursor position
-            if (!NativeMethods.GetCursorPos(out var point))
-                return;
-
-            // Try to get selected text via Ctrl+C
-            var clipboardService = new ClipboardService();
-            var text = await clipboardService.GetSelectedTextAsync();
-
-            if (!string.IsNullOrWhiteSpace(text) && text.Length >= 1 && text.Length <= 5000)
-            {
-                TextSelected?.Invoke(text.Trim(), point.X, point.Y);
-            }
-        }
-        catch
-        {
-            // Silently fail
+            Debug.WriteLine($"[XTranslate] Possible selection at ({point.X}, {point.Y})");
+            PossibleSelection?.Invoke(point.X, point.Y);
         }
     }
 

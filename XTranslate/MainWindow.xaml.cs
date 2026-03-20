@@ -5,9 +5,6 @@ using XTranslate.ViewModels;
 
 namespace XTranslate;
 
-/// <summary>
-/// Main translation window.
-/// </summary>
 public partial class MainWindow : Window
 {
     private MainViewModel ViewModel => (MainViewModel)DataContext;
@@ -19,17 +16,17 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Handle Ctrl+Enter at Window level via PreviewKeyDown.
-    /// This works even when TextBox has focus (AcceptsReturn=True eats normal Enter).
+    /// Ctrl+Enter: call translate directly, bypassing command CanExecute.
     /// </summary>
-    private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    private async void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.Return && Keyboard.Modifiers == ModifierKeys.Control)
         {
-            if (ViewModel.TranslateCommand.CanExecute(null))
+            e.Handled = true;
+
+            if (!string.IsNullOrWhiteSpace(ViewModel.SourceText) && !ViewModel.IsTranslating)
             {
-                ViewModel.TranslateCommand.Execute(null);
-                e.Handled = true;
+                await ViewModel.TranslateAsync();
             }
         }
     }
@@ -58,6 +55,10 @@ public partial class MainWindow : Window
         {
             Owner = this
         };
-        settingsWindow.ShowDialog();
+        if (settingsWindow.ShowDialog() == true)
+        {
+            // Re-register hotkey if changed
+            App.Instance.ReRegisterHotkey();
+        }
     }
 }
