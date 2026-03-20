@@ -73,36 +73,35 @@ public partial class App : Application
 
     // --- Text Selection Monitor ---
 
-    private void StartTextSelectionMonitor()
+    private async void StartTextSelectionMonitor()
     {
         TextSelectionMonitor = new TextSelectionMonitor();
-        TextSelectionMonitor.PossibleSelection += OnPossibleTextSelection;
+        TextSelectionMonitor.PossibleSelection += async (x, y) =>
+        {
+            if (Settings.MouseModeRequiresCtrl && !System.Windows.Input.Keyboard.Modifiers.HasFlag(System.Windows.Input.ModifierKeys.Control))
+                return;
+
+            TextSelectionMonitor.IsEnabled = false;
+            var text = await ClipboardService.GetSelectedTextAsync();
+            TextSelectionMonitor.IsEnabled = true;
+
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                Dispatcher.Invoke(() => _floatingIcon?.ShowAt(x, y, text.Trim()));
+            }
+        };
         TextSelectionMonitor.SelectionCleared += () => Dispatcher.Invoke(() => _floatingIcon?.HideIcon());
         TextSelectionMonitor.Start();
     }
 
-    private void OnPossibleTextSelection(int x, int y)
-    {
-        // Just show the icon — no clipboard capture yet
-        Dispatcher.Invoke(() => _floatingIcon?.ShowAt(x, y, ""));
-    }
-
     /// <summary>
-    /// User clicked the floating icon → now capture text and translate.
+    /// User clicked the floating icon → translate the pre-captured text.
     /// </summary>
-    private async void OnFloatingIconClicked(string _)
+    private async void OnFloatingIconClicked(string text)
     {
         try
         {
-            if (TextSelectionMonitor != null)
-                TextSelectionMonitor.IsEnabled = false;
-
-            var text = await ClipboardService.GetSelectedTextAsync();
-            Debug.WriteLine($"[XTranslate] FloatingIcon click → text='{text?.Substring(0, Math.Min(text?.Length ?? 0, 30))}'");
-
-            if (TextSelectionMonitor != null)
-                TextSelectionMonitor.IsEnabled = true;
-
+            _floatingIcon?.HideIcon();
             if (!string.IsNullOrWhiteSpace(text))
             {
                 await ShowTranslationPopup(text);
@@ -122,16 +121,21 @@ public partial class App : Application
     {
         HotkeyService.HotkeyPressed += OnTranslateHotkeyPressed;
 
-        var hotkey = Settings.TranslateHotkey;
-        bool ok = HotkeyService.RegisterHotkey(hotkey);
-        Debug.WriteLine($"[XTranslate] RegisterHotKey({hotkey}) = {ok}");
+        // Hotkey 1: Popup
+        var hotkeyPopup = Settings.TranslateHotkey;
+        bool okPopup = HotkeyService.RegisterHotkey(hotkeyPopup, 1);
+        Debug.WriteLine($"[XTranslate] RegisterHotKey Popup ({hotkeyPopup}) = {okPopup}");
 
-        if (!ok)
+        // Hotkey 2: Main Window
+        var hotkeyMain = Settings.TranslateMainWindowHotkey;
+        bool okMain = HotkeyService.RegisterHotkey(hotkeyMain, 2);
+        Debug.WriteLine($"[XTranslate] RegisterHotKey Main ({hotkeyMain}) = {okMain}");
+
+        if (!okPopup)
         {
             System.Windows.MessageBox.Show(
-                $"Phím tắt {FormatHotkey(hotkey)} đã bị ứng dụng khác sử dụng.\n\n" +
-                "Vào Cài đặt → Phím tắt để chọn phím tắt khác.\n" +
-                "Bạn vẫn có thể dùng Ctrl+Enter trong cửa sổ chính.",
+                $"Phím tắt Popup {FormatHotkey(hotkeyPopup)} đã bị ứng dụng khác sử dụng.\n\n" +
+                "Vào Cài đặt → Phím tắt để chọn phím tắt khác.",
                 "XTranslate — Phím tắt",
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Information);
@@ -143,22 +147,26 @@ public partial class App : Application
     /// </summary>
     public void ReRegisterHotkey()
     {
-        HotkeyService.UnregisterHotkey();
-        var hotkey = Settings.TranslateHotkey;
-        bool ok = HotkeyService.RegisterHotkey(hotkey);
-        Debug.WriteLine($"[XTranslate] ReRegisterHotKey({hotkey}) = {ok}");
+        HotkeyService.UnregisterHotkey(1);
+        HotkeyService.UnregisterHotkey(2);
 
-        if (!ok)
+        var hotkeyPopup = Settings.TranslateHotkey;
+        bool okPopup = HotkeyService.RegisterHotkey(hotkeyPopup, 1);
+
+        var hotkeyMain = Settings.TranslateMainWindowHotkey;
+        bool okMain = HotkeyService.RegisterHotkey(hotkeyMain, 2);
+
+        if (!okPopup)
         {
             System.Windows.MessageBox.Show(
-                $"Không thể đăng ký phím tắt {FormatHotkey(hotkey)}.\n" +
+                $"Không thể đăng ký phím tắt Popup {FormatHotkey(hotkeyPopup)}.\n" +
                 "Phím có thể đang được sử dụng bởi ứng dụng khác.",
                 "XTranslate", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
         }
 
         // Update tray tooltip
         if (_trayIcon != null)
-            _trayIcon.Text = $"XTranslate — Dịch nhanh ({FormatHotkey(hotkey)})";
+            _trayIcon.Text = $"XTranslate — Dịch nhanh ({FormatHotkey(hotkeyPopup)})";
 
         // Update floating icon
         if (Settings.ShowFloatingIcon && TextSelectionMonitor == null)
@@ -184,22 +192,34 @@ public partial class App : Application
         return string.Join("+", parts);
     }
 
-    private async void OnTranslateHotkeyPressed()
+    private async void OnTranslateHotkeyPressed(int hotkeyId)
     {
-        Debug.WriteLine("[XTranslate] Hotkey pressed!");
+        Debug.WriteLine($"[XTranslate] Hotkey pressed: ID={hotkeyId}");
         try
         {
             if (TextSelectionMonitor != null)
                 TextSelectionMonitor.IsEnabled = false;
             _floatingIcon?.HideIcon();
 
-            var text = await ClipboardService.GetSelectedTextAsync();
+            var text = await ClipboardService.GetSelectedTextAsync() ?? "";
 
             if (TextSelectionMonitor != null)
                 TextSelectionMonitor.IsEnabled = true;
 
-            if (!string.IsNullOrWhiteSpace(text))
-                await ShowTranslationPopup(text);
+            if (hotkeyId == 1) // Popup (Ctrl+Q)
+            {
+                if (!string.IsNullOrWhiteSpace(text))
+                    await ShowTranslationPopup(text);
+            }
+            else if (hotkeyId == 2) // Main Window (Ctrl+Enter)
+            {
+                ShowMainWindow();
+                if (!string.IsNullOrWhiteSpace(text) && _mainWindow?.DataContext is MainViewModel vm)
+                {
+                    vm.SourceText = text.Trim();
+                    await vm.TranslateAsync();
+                }
+            }
         }
         catch (Exception ex)
         {

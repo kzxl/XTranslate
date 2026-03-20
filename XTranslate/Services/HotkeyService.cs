@@ -10,13 +10,12 @@ namespace XTranslate.Services;
 /// </summary>
 public class HotkeyService : IDisposable
 {
-    public event Action? HotkeyPressed;
+    public event Action<int>? HotkeyPressed;
 
     private HwndSource? _hwndSource;
-    private bool _isRegistered;
-    private const int HotkeyId = 9000;
+    private readonly HashSet<int> _registeredIds = new();
 
-    public bool IsRegistered => _isRegistered;
+    public bool IsRegistered(int hotkeyId = 9000) => _registeredIds.Contains(hotkeyId);
 
     public HotkeyService()
     {
@@ -34,33 +33,35 @@ public class HotkeyService : IDisposable
         _hwndSource.AddHook(WndProc);
     }
 
-    public bool RegisterHotkey(Keys hotkey)
+    public bool RegisterHotkey(Keys hotkey, int hotkeyId = 9000)
     {
-        UnregisterHotkey();
+        UnregisterHotkey(hotkeyId);
 
         if (_hwndSource == null) return false;
 
         var modifiers = GetModifiers(hotkey);
         var vk = (uint)(hotkey & Keys.KeyCode);
 
-        _isRegistered = NativeMethods.RegisterHotKey(_hwndSource.Handle, HotkeyId, modifiers, vk);
-        return _isRegistered;
+        bool success = NativeMethods.RegisterHotKey(_hwndSource.Handle, hotkeyId, modifiers, vk);
+        if (success) _registeredIds.Add(hotkeyId);
+        return success;
     }
 
-    public void UnregisterHotkey()
+    public void UnregisterHotkey(int hotkeyId = 9000)
     {
-        if (_isRegistered && _hwndSource != null)
+        if (_registeredIds.Contains(hotkeyId) && _hwndSource != null)
         {
-            NativeMethods.UnregisterHotKey(_hwndSource.Handle, HotkeyId);
-            _isRegistered = false;
+            NativeMethods.UnregisterHotKey(_hwndSource.Handle, hotkeyId);
+            _registeredIds.Remove(hotkeyId);
         }
     }
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == NativeMethods.WM_HOTKEY && wParam.ToInt32() == HotkeyId)
+        if (msg == NativeMethods.WM_HOTKEY)
         {
-            HotkeyPressed?.Invoke();
+            int hotkeyId = wParam.ToInt32();
+            HotkeyPressed?.Invoke(hotkeyId);
             handled = true;
         }
         return IntPtr.Zero;
@@ -77,7 +78,10 @@ public class HotkeyService : IDisposable
 
     public void Dispose()
     {
-        UnregisterHotkey();
+        var ids = _registeredIds.ToList();
+        foreach (var id in ids)
+            UnregisterHotkey(id);
+            
         _hwndSource?.RemoveHook(WndProc);
         _hwndSource?.Dispose();
         _hwndSource = null;

@@ -9,6 +9,7 @@ public class AppSettings
 {
     // --- Hotkeys ---
     public Keys TranslateHotkey { get; set; } = Keys.Control | Keys.Q;
+    public Keys TranslateMainWindowHotkey { get; set; } = Keys.Control | Keys.Enter;
     
     // --- Languages ---
     public string DefaultSourceLanguage { get; set; } = "auto";
