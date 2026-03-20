@@ -95,6 +95,8 @@ public class MainViewModel : ViewModelBase
         IsTranslating = true;
         StatusText = "Đang dịch...";
 
+        bool autoSwitched = false;
+    retry:
         try
         {
             var result = await _translationService.TranslateAsync(
@@ -102,6 +104,21 @@ public class MainViewModel : ViewModelBase
 
             if (result.IsSuccess)
             {
+                if (SourceLanguage.Code == "auto" && !autoSwitched && !string.IsNullOrEmpty(result.DetectedLanguageCode))
+                {
+                    string detected = result.DetectedLanguageCode.Split('-')[0].ToLower();
+                    string currentTarget = TargetLanguage.Code.Split('-')[0].ToLower();
+
+                    if (detected == currentTarget)
+                    {
+                        string newTargetLang = (detected == "vi") ? "en" : "vi";
+                        TargetLanguage = TargetLanguages.FirstOrDefault(l => l.Code == newTargetLang) ?? TargetLanguage;
+                        autoSwitched = true;
+                        
+                        goto retry;
+                    }
+                }
+
                 TranslatedText = result.TranslatedText;
 
                 // Update detected language display
