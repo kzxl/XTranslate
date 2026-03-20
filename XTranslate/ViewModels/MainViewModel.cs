@@ -60,6 +60,8 @@ public class MainViewModel : ViewModelBase
         set => SetProperty(ref _statusText, value);
     }
 
+    private string _lastDetectedLangCode = "";
+
     public int CharacterCount => SourceText?.Length ?? 0;
 
     public IReadOnlyList<Language> SourceLanguages => LanguageDatabase.SourceLanguages;
@@ -134,10 +136,30 @@ public class MainViewModel : ViewModelBase
 
     private void SwapLanguages()
     {
-        if (SourceLanguage.Code == "auto") return;
+        if (SourceLanguage.Code == "auto")
+        {
+            if (string.IsNullOrEmpty(_lastDetectedLangCode) || _lastDetectedLangCode == "auto")
+                return;
 
-        (SourceLanguage, TargetLanguage) = (TargetLanguage, SourceLanguage);
+            var newTarget = TargetLanguages.FirstOrDefault(l => l.Code == _lastDetectedLangCode);
+            if (newTarget == null) return;
+            
+            var oldTarget = TargetLanguage;
+            TargetLanguage = newTarget;
+            SourceLanguage = SourceLanguages.FirstOrDefault(l => l.Code == oldTarget.Code) ?? SourceLanguages[0];
+        }
+        else
+        {
+            var oldTarget = TargetLanguage;
+            TargetLanguage = TargetLanguages.FirstOrDefault(l => l.Code == SourceLanguage.Code) ?? TargetLanguages[0];
+            SourceLanguage = SourceLanguages.FirstOrDefault(l => l.Code == oldTarget.Code) ?? SourceLanguages[0];
+        }
+
         (SourceText, TranslatedText) = (TranslatedText, SourceText);
+        
+        // Auto trigger translate after swapping, similar to QTranslate
+        if (!string.IsNullOrWhiteSpace(SourceText))
+            _ = TranslateAsync();
     }
 
     private void CopyResult()

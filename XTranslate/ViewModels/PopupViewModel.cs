@@ -26,6 +26,8 @@ public class PopupViewModel : ViewModelBase
         set => SetProperty(ref _translatedText, value);
     }
 
+    private string _lastDetectedLangCode = "";
+
     private string _detectedLanguage = "";
     public string DetectedLanguage
     {
@@ -91,12 +93,23 @@ public class PopupViewModel : ViewModelBase
 
         SwapLanguagesCommand = new RelayCommand(() =>
         {
-            if (SourceLanguage?.Code == "auto") return;
-            var temp = SourceLanguage;
-            SourceLanguage = TargetLanguage;
-            TargetLanguage = temp;
+            Language? newSource = TargetLanguage;
+            Language? newTarget = SourceLanguage;
+
+            if (SourceLanguage?.Code == "auto")
+            {
+                if (string.IsNullOrEmpty(_lastDetectedLangCode) || _lastDetectedLangCode == "auto")
+                    return;
+
+                newTarget = Languages.FirstOrDefault(l => l.Code == _lastDetectedLangCode);
+                if (newTarget == null) return;
+            }
+
+            _isInitializing = true;
+            SourceLanguage = newSource ?? Languages[0];
+            _isInitializing = false;
             
-            // Note: Setting SourceLanguage and TargetLanguage triggers Re-Translate due to Property Setter.
+            TargetLanguage = newTarget;
         });
 
         CopyCommand = new RelayCommand(() =>
@@ -121,15 +134,40 @@ public class PopupViewModel : ViewModelBase
         IsTranslating = true;
         HasError = false;
 
+        bool autoSwitched = false;
+    retry:
         try
         {
             var result = await _translationService.TranslateAsync(SourceText, sourceLang, targetLang);
 
             if (result.IsSuccess)
             {
+                // Logic thông minh: NẾU dịch ra mà Ngôn ngữ Vừa Detect trùng béng luôn với Ngôn ngữ Đích (ví dụ text TV -> Dịch sang TV).
+                // TA sẽ tự động tráo ngôn ngữ đích sang Anh (hoặc Việt nếu là TA) và dịch lại thêm 1 phát nữa.
+                if (sourceLang == "auto" && !autoSwitched && !string.IsNullOrEmpty(result.DetectedLanguageCode))
+                {
+                    string detected = result.DetectedLanguageCode.Split('-')[0].ToLower();
+                    string currentTarget = targetLang.Split('-')[0].ToLower();
+
+                    if (detected == currentTarget)
+                    {
+                        string newTargetLang = (detected == "vi") ? "en" : "vi";
+                        targetLang = newTargetLang;
+                        autoSwitched = true;
+
+                        // Cập nhật âm thầm lên ComboBox UI mà không làm API bắn lần 3
+                        _isInitializing = true;
+                        TargetLanguage = Languages.FirstOrDefault(l => l.Code == newTargetLang) ?? TargetLanguage;
+                        _isInitializing = false;
+
+                        goto retry;
+                    }
+                }
+
                 TranslatedText = result.TranslatedText;
-                var detected = LanguageDatabase.FindByCode(result.DetectedLanguageCode);
-                DetectedLanguage = detected?.Name ?? result.DetectedLanguageCode;
+                _lastDetectedLangCode = result.DetectedLanguageCode;
+                var detectedObj = LanguageDatabase.FindByCode(result.DetectedLanguageCode);
+                DetectedLanguage = detectedObj?.Name ?? result.DetectedLanguageCode;
             }
             else
             {
