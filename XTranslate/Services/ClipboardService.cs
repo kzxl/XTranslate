@@ -25,14 +25,14 @@ public class ClipboardService
             Clipboard.Clear();
         });
 
-        // Small delay for stability
-        await Task.Delay(50);
+        // Small delay for stability to let user release keys
+        await Task.Delay(100);
 
-        // Simulate Ctrl+C
+        // Simulate Ctrl+C (with modifier release first)
         SimulateCtrlC();
 
-        // Wait for clipboard to be populated
-        await Task.Delay(150);
+        // Wait for clipboard to be populated (some apps like Chrome need more time)
+        await Task.Delay(200);
 
         // Read new clipboard content
         string selectedText = "";
@@ -58,6 +58,11 @@ public class ClipboardService
     {
         var inputs = new NativeMethods.INPUT[]
         {
+            // Release any pressed modifiers just in case
+            CreateKeyInput(NativeMethods.VK_CONTROL, true),
+            CreateKeyInput((ushort)System.Windows.Forms.Keys.ShiftKey, true),
+            CreateKeyInput((ushort)System.Windows.Forms.Keys.Enter, true),
+            
             // Ctrl down
             CreateKeyInput(NativeMethods.VK_CONTROL, false),
             // C down
@@ -68,8 +73,7 @@ public class ClipboardService
             CreateKeyInput(NativeMethods.VK_CONTROL, true)
         };
 
-        NativeMethods.SendInput((uint)inputs.Length, inputs,
-            Marshal.SizeOf(typeof(NativeMethods.INPUT)));
+        NativeMethods.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(NativeMethods.INPUT)));
     }
 
     private static NativeMethods.INPUT CreateKeyInput(ushort vk, bool keyUp)

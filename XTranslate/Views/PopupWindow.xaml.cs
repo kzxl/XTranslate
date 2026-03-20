@@ -10,6 +10,8 @@ namespace XTranslate.Views;
 /// </summary>
 public partial class PopupWindow : Window
 {
+    private bool _canClose;
+
     public PopupWindow(PopupViewModel viewModel)
     {
         InitializeComponent();
@@ -36,13 +38,20 @@ public partial class PopupWindow : Window
         }
 
         // Focus for keyboard input (Esc to close)
+        Activate();
         Focus();
+        
+        // Prevent auto-closing immediately due to initial focus glitches
+        Task.Delay(200).ContinueWith(_ => _canClose = true);
     }
 
     private void Window_Deactivated(object sender, EventArgs e)
     {
-        // Auto-close when popup loses focus
-        Close();
+        // Auto-close when popup loses focus, but only after initial delay
+        if (_canClose)
+        {
+            Close();
+        }
     }
 
     protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e)
