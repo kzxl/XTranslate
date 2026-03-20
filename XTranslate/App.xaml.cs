@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Threading;
 using XTranslate.Models;
@@ -40,59 +41,122 @@ public partial class App : Application
         SettingsService = new SettingsService();
         SettingsService.Load();
 
-        // Engine registry — add new engines here
+        // Engine registry
         EngineRegistry = new TranslationEngineRegistry();
         EngineRegistry.Register(new GoogleTranslateEngine());
-        // Future: EngineRegistry.Register(new BingTranslateEngine());
-        // Future: EngineRegistry.Register(new DeepLTranslateEngine());
 
         TranslationService = new TranslationService(EngineRegistry);
         ClipboardService = new ClipboardService();
-        HotkeyService = new HotkeyService();
 
-        // Create main window
+        // Create main window first (needed for hotkey service on same thread)
         var mainViewModel = new MainViewModel(TranslationService);
         _mainWindow = new MainWindow(mainViewModel);
 
-        // Setup floating icon
+        // Setup hotkey with diagnostics
+        HotkeyService = new HotkeyService();
+        SetupHotkey();
+
+        // Floating icon
         _floatingIcon = new FloatingIconWindow();
         _floatingIcon.TranslateRequested += OnFloatingIconTranslateRequested;
 
-        // Setup text selection monitor
-        TextSelectionMonitor = new TextSelectionMonitor();
-        TextSelectionMonitor.TextSelected += OnTextSelected;
-        TextSelectionMonitor.SelectionCleared += OnSelectionCleared;
-        TextSelectionMonitor.Start();
+        // Text selection monitor
+        if (Settings.ShowFloatingIcon)
+        {
+            TextSelectionMonitor = new TextSelectionMonitor();
+            TextSelectionMonitor.TextSelected += OnTextSelected;
+            TextSelectionMonitor.SelectionCleared += OnSelectionCleared;
+            TextSelectionMonitor.Start();
+        }
 
-        // Setup system tray
+        // System tray
         SetupSystemTray();
-
-        // Setup global hotkey
-        SetupHotkey();
 
         // Show main window
         if (!Settings.StartMinimized)
         {
             _mainWindow.Show();
         }
+
+        Debug.WriteLine("[XTranslate] Startup complete.");
     }
 
-    // --- Text Selection → Floating Icon ---
+    // --- Hotkey ---
+
+    private void SetupHotkey()
+    {
+        HotkeyService.HotkeyPressed += OnTranslateHotkeyPressed;
+
+        var hotkey = Settings.TranslateHotkey;
+        bool registered = HotkeyService.RegisterHotkey(hotkey);
+
+        Debug.WriteLine($"[XTranslate] RegisterHotKey({hotkey}) = {registered}");
+
+        if (!registered)
+        {
+            // Try alternative: Ctrl+Shift+Q
+            var altHotkey = System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Shift | System.Windows.Forms.Keys.Q;
+            registered = HotkeyService.RegisterHotkey(altHotkey);
+            Debug.WriteLine($"[XTranslate] Fallback RegisterHotKey({altHotkey}) = {registered}");
+
+            string msg;
+            if (registered)
+            {
+                Settings.TranslateHotkey = altHotkey;
+                msg = "Phím tắt Ctrl+Q đã bị ứng dụng khác sử dụng.\n" +
+                      "XTranslate đã tự động chuyển sang: Ctrl+Shift+Q";
+            }
+            else
+            {
+                msg = "Không thể đăng ký phím tắt nhanh.\n" +
+                      "Có thể phím tắt đã được sử dụng bởi ứng dụng khác.\n\n" +
+                      "Bạn vẫn có thể dùng Ctrl+Enter trong cửa sổ chính để dịch.";
+            }
+
+            System.Windows.MessageBox.Show(msg, "XTranslate — Phím tắt",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Information);
+        }
+    }
+
+    private async void OnTranslateHotkeyPressed()
+    {
+        Debug.WriteLine("[XTranslate] Hotkey pressed!");
+
+        try
+        {
+            if (TextSelectionMonitor != null)
+                TextSelectionMonitor.IsEnabled = false;
+            _floatingIcon?.HideIcon();
+
+            var selectedText = await ClipboardService.GetSelectedTextAsync();
+            Debug.WriteLine($"[XTranslate] Selected text: '{selectedText?.Substring(0, Math.Min(selectedText?.Length ?? 0, 50))}'");
+
+            if (TextSelectionMonitor != null)
+                TextSelectionMonitor.IsEnabled = true;
+
+            if (!string.IsNullOrWhiteSpace(selectedText))
+            {
+                await ShowTranslationPopup(selectedText);
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[XTranslate] Hotkey error: {ex.Message}");
+            if (TextSelectionMonitor != null)
+                TextSelectionMonitor.IsEnabled = true;
+        }
+    }
+
+    // --- Floating Icon ---
 
     private void OnTextSelected(string text, int x, int y)
     {
-        Dispatcher.Invoke(() =>
-        {
-            _floatingIcon?.ShowAt(x, y, text);
-        });
+        Dispatcher.Invoke(() => _floatingIcon?.ShowAt(x, y, text));
     }
 
     private void OnSelectionCleared()
     {
-        Dispatcher.Invoke(() =>
-        {
-            _floatingIcon?.HideIcon();
-        });
+        Dispatcher.Invoke(() => _floatingIcon?.HideIcon());
     }
 
     private async void OnFloatingIconTranslateRequested(string text)
@@ -100,11 +164,21 @@ public partial class App : Application
         await ShowTranslationPopup(text);
     }
 
+    private async Task ShowTranslationPopup(string text)
+    {
+        await Dispatcher.InvokeAsync(async () =>
+        {
+            var popupVm = new PopupViewModel(TranslationService);
+            var popup = new PopupWindow(popupVm);
+            popup.Show();
+            await popupVm.TranslateAsync(text, Settings.DefaultTargetLanguage);
+        });
+    }
+
     // --- System Tray ---
 
     private void SetupSystemTray()
     {
-        // Load custom icon, fallback to system icon
         System.Drawing.Icon appIcon;
         try
         {
@@ -121,9 +195,13 @@ public partial class App : Application
             appIcon = System.Drawing.SystemIcons.Application;
         }
 
+        // Build hotkey display text
+        var hotkeyText = Settings.TranslateHotkey.HasFlag(System.Windows.Forms.Keys.Shift)
+            ? "Ctrl+Shift+Q" : "Ctrl+Q";
+
         _trayIcon = new System.Windows.Forms.NotifyIcon
         {
-            Text = "XTranslate — Dịch nhanh (Ctrl+Q)",
+            Text = $"XTranslate — Dịch nhanh ({hotkeyText})",
             Icon = appIcon,
             Visible = true,
             ContextMenuStrip = CreateTrayMenu()
@@ -164,54 +242,6 @@ public partial class App : Application
         return menu;
     }
 
-    // --- Global Hotkey ---
-
-    private void SetupHotkey()
-    {
-        HotkeyService.HotkeyPressed += OnTranslateHotkeyPressed;
-
-        if (!HotkeyService.RegisterHotkey(Settings.TranslateHotkey))
-        {
-            System.Windows.MessageBox.Show(
-                "Không thể đăng ký phím tắt Ctrl+Q.\nCó thể phím tắt đã được sử dụng bởi ứng dụng khác.",
-                "XTranslate", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
-        }
-    }
-
-    private async void OnTranslateHotkeyPressed()
-    {
-        try
-        {
-            // Disable text selection monitor briefly to avoid interference
-            TextSelectionMonitor.IsEnabled = false;
-            _floatingIcon?.HideIcon();
-
-            var selectedText = await ClipboardService.GetSelectedTextAsync();
-
-            TextSelectionMonitor.IsEnabled = true;
-
-            if (!string.IsNullOrWhiteSpace(selectedText))
-            {
-                await ShowTranslationPopup(selectedText);
-            }
-        }
-        catch
-        {
-            TextSelectionMonitor.IsEnabled = true;
-        }
-    }
-
-    private async Task ShowTranslationPopup(string text)
-    {
-        await Dispatcher.InvokeAsync(async () =>
-        {
-            var popupVm = new PopupViewModel(TranslationService);
-            var popup = new PopupWindow(popupVm);
-            popup.Show();
-            await popupVm.TranslateAsync(text, Settings.DefaultTargetLanguage);
-        });
-    }
-
     // --- Window Management ---
 
     private void ShowMainWindow()
@@ -244,7 +274,7 @@ public partial class App : Application
 
     private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        Console.WriteLine("Unhandled exception: " + e.Exception.Message);
+        Debug.WriteLine($"[XTranslate] UNHANDLED: {e.Exception}");
         e.Handled = true;
     }
 }

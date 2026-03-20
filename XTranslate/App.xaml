@@ -5,20 +5,20 @@
              Startup="Application_Startup"
              Exit="Application_Exit">
     <Application.Resources>
-        <!-- ===== DARK THEME COLOR PALETTE ===== -->
-        <Color x:Key="BgPrimary">#FF16172B</Color>
-        <Color x:Key="BgSecondary">#FF1E2040</Color>
-        <Color x:Key="BgTertiary">#FF2A2C52</Color>
-        <Color x:Key="BgPanel">#FF272850</Color>
-        <Color x:Key="AccentPrimary">#FF7B73FF</Color>
-        <Color x:Key="AccentSecondary">#FFAD6AE8</Color>
-        <Color x:Key="AccentGradientEnd">#FF64A4E8</Color>
-        <Color x:Key="TextPrimary">#FFFFFFFF</Color>
-        <Color x:Key="TextSecondary">#FFBBBBD4</Color>
-        <Color x:Key="TextMuted">#FF8989A8</Color>
-        <Color x:Key="BorderColor">#FF454570</Color>
-        <Color x:Key="ErrorColor">#FFFF7A7A</Color>
-        <Color x:Key="SuccessColor">#FF5CCC8C</Color>
+        <!-- ===== MODERN DARK THEME ===== -->
+        <Color x:Key="BgPrimary">#FF0F1117</Color>
+        <Color x:Key="BgSecondary">#FF161822</Color>
+        <Color x:Key="BgTertiary">#FF1E2030</Color>
+        <Color x:Key="BgPanel">#FF1A1C2E</Color>
+        <Color x:Key="AccentPrimary">#FF818CF8</Color>
+        <Color x:Key="AccentSecondary">#FFA78BFA</Color>
+        <Color x:Key="AccentGradientEnd">#FF60A5FA</Color>
+        <Color x:Key="TextPrimary">#FFF1F5F9</Color>
+        <Color x:Key="TextSecondary">#FF94A3B8</Color>
+        <Color x:Key="TextMuted">#FF64748B</Color>
+        <Color x:Key="BorderColor">#FF334155</Color>
+        <Color x:Key="ErrorColor">#FFEF4444</Color>
+        <Color x:Key="SuccessColor">#FF22C55E</Color>
 
         <SolidColorBrush x:Key="BgPrimaryBrush" Color="{StaticResource BgPrimary}" />
         <SolidColorBrush x:Key="BgSecondaryBrush" Color="{StaticResource BgSecondary}" />
@@ -39,22 +39,15 @@
             <GradientStop Color="{StaticResource AccentGradientEnd}" Offset="1" />
         </LinearGradientBrush>
 
-        <LinearGradientBrush x:Key="HeaderGradientBrush" StartPoint="0,0" EndPoint="1,0">
-            <GradientStop Color="{StaticResource AccentPrimary}" Offset="0" />
-            <GradientStop Color="{StaticResource AccentSecondary}" Offset="1" />
-        </LinearGradientBrush>
-
-        <!-- ===== GLOBAL STYLES ===== -->
-
-        <!-- TextBox Style -->
+        <!-- ===== TEXTBOX STYLE ===== -->
         <Style x:Key="TranslationTextBox" TargetType="TextBox">
             <Setter Property="Background" Value="{StaticResource BgPanelBrush}" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="Padding" Value="14,10" />
             <Setter Property="FontSize" Value="15" />
-            <Setter Property="FontFamily" Value="Segoe UI, Inter, sans-serif" />
+            <Setter Property="FontFamily" Value="Segoe UI" />
             <Setter Property="TextWrapping" Value="Wrap" />
             <Setter Property="AcceptsReturn" Value="True" />
             <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
@@ -79,30 +72,34 @@
             </Setter>
         </Style>
 
-        <!-- Button Style -->
+        <!-- ===== BUTTON STYLE ===== -->
         <Style x:Key="ModernButton" TargetType="Button">
-            <Setter Property="Background" Value="{StaticResource BgTertiaryBrush}" />
+            <Setter Property="Background" Value="#FF1E2030" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="#FF334155" />
             <Setter Property="Padding" Value="16,8" />
             <Setter Property="FontSize" Value="13" />
-            <Setter Property="FontFamily" Value="Segoe UI, Inter, sans-serif" />
+            <Setter Property="FontFamily" Value="Segoe UI" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="border"
                                 Background="{TemplateBinding Background}"
-                                CornerRadius="6"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="{StaticResource AccentPrimaryBrush}" />
+                                <Setter TargetName="border" Property="Background" Value="#FF2A2D45" />
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="border" Property="Opacity" Value="0.8" />
+                                <Setter TargetName="border" Property="Opacity" Value="0.85" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="border" Property="Opacity" Value="0.4" />
@@ -113,21 +110,129 @@
             </Setter>
         </Style>
 
-        <!-- Accent Button -->
+        <!-- ===== ACCENT BUTTON ===== -->
         <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="Background" Value="{StaticResource AccentPrimaryBrush}" />
+            <Setter Property="Background">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#FF818CF8" Offset="0" />
+                        <GradientStop Color="#FF6366F1" Offset="1" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
 
-        <!-- ComboBox Style -->
-        <Style x:Key="ModernComboBox" TargetType="ComboBox">
-            <Setter Property="Background" Value="{StaticResource BgTertiaryBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="10,6" />
+        <!-- ===== DARK COMBOBOX (full template) ===== -->
+        <ControlTemplate x:Key="DarkComboBoxToggle" TargetType="ToggleButton">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition />
+                    <ColumnDefinition Width="28" />
+                </Grid.ColumnDefinitions>
+                <Border x:Name="Border" Grid.ColumnSpan="2"
+                        Background="#FF1E2030" BorderBrush="#FF334155"
+                        BorderThickness="1" CornerRadius="8" />
+                <Border Grid.Column="0" Background="Transparent" CornerRadius="8,0,0,8" Margin="1" />
+                <!-- Arrow -->
+                <Path x:Name="Arrow" Grid.Column="1"
+                      Data="M 0 0 L 4 4 L 8 0 Z"
+                      Fill="#FF94A3B8" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Grid>
+            <ControlTemplate.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Border" Property="BorderBrush" Value="#FF818CF8" />
+                    <Setter TargetName="Arrow" Property="Fill" Value="#FFF1F5F9" />
+                </Trigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
+        <Style x:Key="DarkComboBox" TargetType="ComboBox">
+            <Setter Property="Foreground" Value="#FFF1F5F9" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontFamily" Value="Segoe UI" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="MinHeight" Value="38" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          Template="{StaticResource DarkComboBoxToggle}"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" />
+                            <ContentPresenter x:Name="ContentSite"
+                                              IsHitTestVisible="False"
+                                              Content="{TemplateBinding SelectionBoxItem}"
+                                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                              Margin="14,3,28,3"
+                                              VerticalAlignment="Center"
+                                              HorizontalAlignment="Left" />
+                            <!-- Dropdown popup -->
+                            <Popup x:Name="Popup" Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True" Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Grid x:Name="DropDown"
+                                      MinWidth="{TemplateBinding ActualWidth}"
+                                      MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder"
+                                            Background="#FF1A1C2E"
+                                            BorderBrush="#FF334155"
+                                            BorderThickness="1"
+                                            CornerRadius="8"
+                                            Margin="0,2,0,0"
+                                            Padding="4">
+                                        <Border.Effect>
+                                            <DropShadowEffect BlurRadius="12" ShadowDepth="4"
+                                                              Opacity="0.4" Color="Black" />
+                                        </Border.Effect>
+                                        <ScrollViewer SnapsToDevicePixels="True">
+                                            <StackPanel IsItemsHost="True"
+                                                        KeyboardNavigation.DirectionalNavigation="Contained" />
+                                        </ScrollViewer>
+                                    </Border>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ComboBoxItem dark style -->
+        <Style x:Key="DarkComboBoxItem" TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="#FFF1F5F9" />
             <Setter Property="FontSize" Value="13" />
-            <Setter Property="FontFamily" Value="Segoe UI, Inter, sans-serif" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd" Background="Transparent"
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FF2A2D45" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FF363A55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ===== CHECKBOX STYLE ===== -->
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#FFF1F5F9" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Cursor" Value="Hand" />
         </Style>
 
         <!-- BooleanToVisibility Converter -->
