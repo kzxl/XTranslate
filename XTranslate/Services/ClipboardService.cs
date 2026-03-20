@@ -25,33 +25,57 @@ public class ClipboardService
             Clipboard.Clear();
         });
 
-        // Small delay for stability to let user release keys
-        await Task.Delay(100);
+        // 1. Wait until user releases modifiers (Ctrl, Shift, Alt, Windows) to prevent stuck keys. Max wait: 1 second
+        int waitLoops = 0;
+        while (IsModifierPressed() && waitLoops < 20)
+        {
+            await Task.Delay(50);
+            waitLoops++;
+        }
 
-        // Simulate Ctrl+C (with modifier release first)
+        // 2. Simulate Ctrl+C
         SimulateCtrlC();
 
-        // Wait for clipboard to be populated (some apps like Chrome need more time)
-        await Task.Delay(200);
-
-        // Read new clipboard content
+        // 3. Retry loop to wait for the target application to populate the clipboard
         string selectedText = "";
-        await RunOnSTAThread(() =>
+        for (int i = 0; i < 20; i++) // Max wait: 1 second
         {
-            if (Clipboard.ContainsText())
-                selectedText = Clipboard.GetText();
-        });
+            await Task.Delay(50);
+            await RunOnSTAThread(() =>
+            {
+                if (Clipboard.ContainsText())
+                    selectedText = Clipboard.GetText();
+            });
 
-        // Restore previous clipboard content
+            if (!string.IsNullOrEmpty(selectedText))
+                break;
+        }
+
+        // 4. Restore previous clipboard content
         await RunOnSTAThread(() =>
         {
-            if (previousText != null)
+            // Only restore if we didn't just copy the exact same string
+            if (previousText != null && previousText != selectedText)
                 Clipboard.SetText(previousText);
-            else
+            else if (previousText == null)
                 Clipboard.Clear();
         });
 
         return selectedText;
+    }
+
+    private static bool IsModifierPressed()
+    {
+        return IsKeyPressed(NativeMethods.VK_CONTROL) ||
+               IsKeyPressed(NativeMethods.VK_SHIFT) ||
+               IsKeyPressed(NativeMethods.VK_MENU) ||
+               IsKeyPressed(NativeMethods.VK_LWIN) ||
+               IsKeyPressed(NativeMethods.VK_RWIN);
+    }
+
+    private static bool IsKeyPressed(ushort vk)
+    {
+        return (NativeMethods.GetAsyncKeyState(vk) & 0x8000) != 0;
     }
 
     private static void SimulateCtrlC()

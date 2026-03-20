@@ -42,11 +42,18 @@ internal static partial class NativeMethods
     // --- Keyboard Input Simulation (for Ctrl+C) ---
 
     [LibraryImport("user32.dll")]
+    public static partial short GetAsyncKeyState(int vKey);
+
+    [LibraryImport("user32.dll")]
     public static partial uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
     public const int INPUT_KEYBOARD = 1;
     public const uint KEYEVENTF_KEYUP = 0x0002;
+    public const ushort VK_SHIFT = 0x10;
     public const ushort VK_CONTROL = 0x11;
+    public const ushort VK_MENU = 0x12; // Alt
+    public const ushort VK_LWIN = 0x5B;
+    public const ushort VK_RWIN = 0x5C;
     public const ushort VK_C = 0x43;
 
     [StructLayout(LayoutKind.Sequential)]
