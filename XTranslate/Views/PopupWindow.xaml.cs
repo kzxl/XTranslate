@@ -25,13 +25,16 @@ public partial class PopupWindow : Window
         {
             // Ensure popup doesn't go off-screen
             var screen = SystemParameters.WorkArea;
-            var left = (double)point.X + 10;
-            var top = (double)point.Y + 10;
+            var left = (double)point.X + 15;
+            var top = (double)point.Y + 25; // Cách mũi tên chuột một đoạn xuống dưới để né đoạn text đang bôi đen
 
+            // Nếu popup bị vượt qua mép phải màn hình
             if (left + ActualWidth > screen.Right)
                 left = screen.Right - ActualWidth - 10;
+                
+            // Nếu popup bị vượt qua mép dưới màn hình (đáy), đảo nó lên phía TRÊN con trỏ chuột
             if (top + ActualHeight > screen.Bottom)
-                top = point.Y - ActualHeight - 10;
+                top = point.Y - ActualHeight - 15;
 
             Left = Math.Max(0, left);
             Top = Math.Max(0, top);
