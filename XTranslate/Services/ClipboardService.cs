@@ -25,15 +25,18 @@ public class ClipboardService
             Clipboard.Clear();
         });
 
-        // 1. Wait until user releases modifiers (Ctrl, Shift, Alt, Windows) to prevent stuck keys. Max wait: 1 second
-        int waitLoops = 0;
-        while (IsModifierPressed() && waitLoops < 20)
+        // 1. Wait until user completely releases modifiers (Ctrl, Shift, Alt, Windows)
+        // Bắt buộc phải chờ bàn phím trống để không xung đột phím vật lý & ảo gây kẹt phím OS.
+        while (IsModifierPressed())
         {
-            await Task.Delay(50);
-            waitLoops++;
+            await Task.Delay(20);
         }
 
-        // 2. Simulate Ctrl+C
+        // Extra delay to ensure OS keyboard state is settled
+        await Task.Delay(30);
+
+        // 2. Simulate clean Ctrl+C
+
         SimulateCtrlC();
 
         // 3. Retry loop to wait for the target application to populate the clipboard
@@ -82,11 +85,6 @@ public class ClipboardService
     {
         var inputs = new NativeMethods.INPUT[]
         {
-            // Release any pressed modifiers just in case
-            CreateKeyInput(NativeMethods.VK_CONTROL, true),
-            CreateKeyInput((ushort)System.Windows.Forms.Keys.ShiftKey, true),
-            CreateKeyInput((ushort)System.Windows.Forms.Keys.Enter, true),
-            
             // Ctrl down
             CreateKeyInput(NativeMethods.VK_CONTROL, false),
             // C down
