@@ -15,7 +15,6 @@ public class ClipboardService
     /// </summary>
     public async Task<string> GetSelectedTextAsync()
     {
-        // Save current clipboard content
         string? previousText = null;
 
         await RunOnSTAThread(() =>
@@ -25,25 +24,24 @@ public class ClipboardService
             Clipboard.Clear();
         });
 
-        // 1. Wait until user completely releases modifiers (Ctrl, Shift, Alt, Windows)
-        // Bắt buộc phải chờ bàn phím trống để không xung đột phím vật lý & ảo gây kẹt phím OS.
-        while (IsModifierPressed())
+        // 1. Gửi lệnh Copy mạnh mẽ nhất của WinForms
+        // Không quan tâm state bàn phím hiện tại, thư viện này tự route message qua OS pipe rất chuẩn.
+        await RunOnSTAThread(() =>
         {
-            await Task.Delay(20);
-        }
+            try 
+            {
+                System.Windows.Forms.SendKeys.Flush();
+                System.Windows.Forms.SendKeys.SendWait("^c");
+                System.Windows.Forms.SendKeys.Flush();
+            } 
+            catch { }
+        });
 
-        // Extra delay to ensure OS keyboard state is settled
-        await Task.Delay(30);
-
-        // 2. Simulate clean Ctrl+C
-
-        SimulateCtrlC();
-
-        // 3. Retry loop to wait for the target application to populate the clipboard
+        // 2. Chờ dữ liệu vào Clipboard (max 20 lần = ~ 600ms)
         string selectedText = "";
-        for (int i = 0; i < 20; i++) // Max wait: 1 second
+        for (int i = 0; i < 20; i++) 
         {
-            await Task.Delay(50);
+            await Task.Delay(30);
             await RunOnSTAThread(() =>
             {
                 if (Clipboard.ContainsText())
@@ -54,10 +52,9 @@ public class ClipboardService
                 break;
         }
 
-        // 4. Restore previous clipboard content
+        // 3. Khôi phục lại dữ liệu nếu có
         await RunOnSTAThread(() =>
         {
-            // Only restore if we didn't just copy the exact same string
             if (previousText != null && previousText != selectedText)
                 Clipboard.SetText(previousText);
             else if (previousText == null)
@@ -65,53 +62,6 @@ public class ClipboardService
         });
 
         return selectedText;
-    }
-
-    private static bool IsModifierPressed()
-    {
-        return IsKeyPressed(NativeMethods.VK_CONTROL) ||
-               IsKeyPressed(NativeMethods.VK_SHIFT) ||
-               IsKeyPressed(NativeMethods.VK_MENU) ||
-               IsKeyPressed(NativeMethods.VK_LWIN) ||
-               IsKeyPressed(NativeMethods.VK_RWIN);
-    }
-
-    private static bool IsKeyPressed(ushort vk)
-    {
-        return (NativeMethods.GetAsyncKeyState(vk) & 0x8000) != 0;
-    }
-
-    private static void SimulateCtrlC()
-    {
-        var inputs = new NativeMethods.INPUT[]
-        {
-            // Ctrl down
-            CreateKeyInput(NativeMethods.VK_CONTROL, false),
-            // C down
-            CreateKeyInput(NativeMethods.VK_C, false),
-            // C up
-            CreateKeyInput(NativeMethods.VK_C, true),
-            // Ctrl up
-            CreateKeyInput(NativeMethods.VK_CONTROL, true)
-        };
-
-        NativeMethods.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(NativeMethods.INPUT)));
-    }
-
-    private static NativeMethods.INPUT CreateKeyInput(ushort vk, bool keyUp)
-    {
-        return new NativeMethods.INPUT
-        {
-            Type = NativeMethods.INPUT_KEYBOARD,
-            Union = new NativeMethods.INPUTUNION
-            {
-                Keyboard = new NativeMethods.KEYBDINPUT
-                {
-                    Vk = vk,
-                    Flags = keyUp ? NativeMethods.KEYEVENTF_KEYUP : 0
-                }
-            }
-        };
     }
 
     private static Task RunOnSTAThread(Action action)
