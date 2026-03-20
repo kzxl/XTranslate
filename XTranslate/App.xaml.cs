@@ -104,10 +104,27 @@ public partial class App : Application
 
     private void SetupSystemTray()
     {
+        // Load custom icon, fallback to system icon
+        System.Drawing.Icon appIcon;
+        try
+        {
+            var iconPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "icon.ico");
+            if (System.IO.File.Exists(iconPath))
+                appIcon = new System.Drawing.Icon(iconPath);
+            else
+                appIcon = System.Drawing.Icon.ExtractAssociatedIcon(
+                    System.Reflection.Assembly.GetExecutingAssembly().Location)
+                    ?? System.Drawing.SystemIcons.Application;
+        }
+        catch
+        {
+            appIcon = System.Drawing.SystemIcons.Application;
+        }
+
         _trayIcon = new System.Windows.Forms.NotifyIcon
         {
             Text = "XTranslate — Dịch nhanh (Ctrl+Q)",
-            Icon = System.Drawing.SystemIcons.Application,
+            Icon = appIcon,
             Visible = true,
             ContextMenuStrip = CreateTrayMenu()
         };
