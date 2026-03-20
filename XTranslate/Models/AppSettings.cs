@@ -19,10 +19,15 @@ public class AppSettings
     public bool StartWithWindows { get; set; } = false;
     public bool MinimizeToTray { get; set; } = true;
     public bool ShowPopupOnHotkey { get; set; } = true;
+    public bool ShowFloatingIcon { get; set; } = true;
+    public int PopupAutoCloseSeconds { get; set; } = 5;
+
+    // --- Engine ---
+    public string ActiveEngineName { get; set; } = "Google Translate";
 
     // --- Window State ---
     public double WindowLeft { get; set; } = double.NaN;
     public double WindowTop { get; set; } = double.NaN;
-    public double WindowWidth { get; set; } = 800;
-    public double WindowHeight { get; set; } = 500;
+    public double WindowWidth { get; set; } = 900;
+    public double WindowHeight { get; set; } = 560;
 }

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Input;
 using XTranslate.ViewModels;
 
 namespace XTranslate;
@@ -9,15 +10,32 @@ namespace XTranslate;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private MainViewModel ViewModel => (MainViewModel)DataContext;
+
     public MainWindow(MainViewModel viewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
     }
 
+    /// <summary>
+    /// Handle Ctrl+Enter at Window level via PreviewKeyDown.
+    /// This works even when TextBox has focus (AcceptsReturn=True eats normal Enter).
+    /// </summary>
+    private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == Key.Return && Keyboard.Modifiers == ModifierKeys.Control)
+        {
+            if (ViewModel.TranslateCommand.CanExecute(null))
+            {
+                ViewModel.TranslateCommand.Execute(null);
+                e.Handled = true;
+            }
+        }
+    }
+
     private void Window_Closing(object sender, CancelEventArgs e)
     {
-        // Minimize to tray instead of closing
         if (App.Instance.Settings.MinimizeToTray)
         {
             e.Cancel = true;
@@ -27,10 +45,10 @@ public partial class MainWindow : Window
 
     private void Window_StateChanged(object sender, EventArgs e)
     {
-        if (WindowState == WindowState.Minimized && App.Instance.Settings.MinimizeToTray)
+        if (WindowState == System.Windows.WindowState.Minimized && App.Instance.Settings.MinimizeToTray)
         {
             Hide();
-            WindowState = WindowState.Normal;
+            WindowState = System.Windows.WindowState.Normal;
         }
     }
 

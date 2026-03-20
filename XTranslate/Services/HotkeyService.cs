@@ -1,4 +1,3 @@
-using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Interop;
 using XTranslate.Native;
@@ -7,55 +6,52 @@ namespace XTranslate.Services;
 
 /// <summary>
 /// Manages global hotkey registration via Win32 RegisterHotKey/UnregisterHotKey.
-/// Uses a hidden WPF window as message sink.
+/// Uses HwndSource directly as message sink (more reliable than hidden WPF Window).
 /// </summary>
 public class HotkeyService : IDisposable
 {
     public event Action? HotkeyPressed;
 
-    private readonly Window _messageWindow;
-    private IntPtr _windowHandle;
     private HwndSource? _hwndSource;
     private bool _isRegistered;
     private const int HotkeyId = 9000;
 
+    public bool IsRegistered => _isRegistered;
+
     public HotkeyService()
     {
-        // Create a hidden window to receive WM_HOTKEY messages
-        _messageWindow = new Window
+        // Create a message-only window via HwndSource — no WPF Window needed
+        var parameters = new HwndSourceParameters("XTranslateHotkeyMsgSink")
         {
             Width = 0,
             Height = 0,
-            ShowInTaskbar = false,
-            WindowStyle = WindowStyle.None,
-            Visibility = Visibility.Hidden
+            PositionX = -100,
+            PositionY = -100,
+            WindowStyle = 0 // no visible style
         };
-        _messageWindow.SourceInitialized += (_, _) =>
-        {
-            _windowHandle = new WindowInteropHelper(_messageWindow).Handle;
-            _hwndSource = HwndSource.FromHwnd(_windowHandle);
-            _hwndSource?.AddHook(WndProc);
-        };
-        _messageWindow.Show();
-        _messageWindow.Hide();
+
+        _hwndSource = new HwndSource(parameters);
+        _hwndSource.AddHook(WndProc);
     }
 
     public bool RegisterHotkey(Keys hotkey)
     {
         UnregisterHotkey();
 
+        if (_hwndSource == null) return false;
+
         var modifiers = GetModifiers(hotkey);
         var vk = (uint)(hotkey & Keys.KeyCode);
 
-        _isRegistered = NativeMethods.RegisterHotKey(_windowHandle, HotkeyId, modifiers, vk);
+        _isRegistered = NativeMethods.RegisterHotKey(_hwndSource.Handle, HotkeyId, modifiers, vk);
         return _isRegistered;
     }
 
     public void UnregisterHotkey()
     {
-        if (_isRegistered && _windowHandle != IntPtr.Zero)
+        if (_isRegistered && _hwndSource != null)
         {
-            NativeMethods.UnregisterHotKey(_windowHandle, HotkeyId);
+            NativeMethods.UnregisterHotKey(_hwndSource.Handle, HotkeyId);
             _isRegistered = false;
         }
     }
@@ -83,6 +79,7 @@ public class HotkeyService : IDisposable
     {
         UnregisterHotkey();
         _hwndSource?.RemoveHook(WndProc);
-        _messageWindow.Close();
+        _hwndSource?.Dispose();
+        _hwndSource = null;
     }
 }
