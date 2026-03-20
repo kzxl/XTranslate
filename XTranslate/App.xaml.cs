@@ -26,6 +26,8 @@ public partial class App : Application
     private System.Windows.Forms.NotifyIcon? _trayIcon;
     private MainWindow? _mainWindow;
     private FloatingIconWindow? _floatingIcon;
+    private System.Windows.Forms.ToolStripMenuItem? _hotkeyToggle;
+    private System.Windows.Forms.ToolStripMenuItem? _mouseToggle;
 
     public App()
     {
@@ -245,10 +247,22 @@ public partial class App : Application
     {
         var menu = new System.Windows.Forms.ContextMenuStrip();
 
+        // --- Title ---
+        var titleItem = new System.Windows.Forms.ToolStripMenuItem("XTranslate");
+        titleItem.Font = new System.Drawing.Font(titleItem.Font.FontFamily, titleItem.Font.Size + 1, System.Drawing.FontStyle.Bold);
+        titleItem.Click += (_, _) => ShowMainWindow();
+        menu.Items.Add(titleItem);
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+
+        // --- Main actions ---
         var showItem = new System.Windows.Forms.ToolStripMenuItem("Hiện cửa sổ chính");
         showItem.Click += (_, _) => ShowMainWindow();
-        showItem.Font = new System.Drawing.Font(showItem.Font, System.Drawing.FontStyle.Bold);
         menu.Items.Add(showItem);
+
+        var historyItem = new System.Windows.Forms.ToolStripMenuItem("Lịch sử dịch");
+        historyItem.Enabled = false; // Future feature
+        menu.Items.Add(historyItem);
+
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
 
         var settingsItem = new System.Windows.Forms.ToolStripMenuItem("Cài đặt");
@@ -262,8 +276,63 @@ public partial class App : Application
             }
         };
         menu.Items.Add(settingsItem);
+
+        var aboutItem = new System.Windows.Forms.ToolStripMenuItem("Về XTranslate");
+        aboutItem.Click += (_, _) =>
+        {
+            System.Windows.MessageBox.Show(
+                "XTranslate v1.0\n\n" +
+                "Phần mềm dịch thuật nhanh cho Windows.\n" +
+                "Thay thế QTranslate — hiện đại, nhẹ nhàng.\n\n" +
+                $"Engine: {EngineRegistry.ActiveEngineName}\n" +
+                $"Hotkey: {FormatHotkey(Settings.TranslateHotkey)}\n" +
+                $".NET {Environment.Version}",
+                "Về XTranslate", System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+        };
+        menu.Items.Add(aboutItem);
+
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
 
+        // --- Toggle items ---
+        _hotkeyToggle = new System.Windows.Forms.ToolStripMenuItem("Bật phím tắt toàn cục");
+        _hotkeyToggle.Checked = true;
+        _hotkeyToggle.CheckOnClick = true;
+        _hotkeyToggle.CheckedChanged += (_, _) =>
+        {
+            if (_hotkeyToggle.Checked)
+            {
+                HotkeyService.RegisterHotkey(Settings.TranslateHotkey);
+            }
+            else
+            {
+                HotkeyService.UnregisterHotkey();
+            }
+        };
+        menu.Items.Add(_hotkeyToggle);
+
+        _mouseToggle = new System.Windows.Forms.ToolStripMenuItem("Chế độ chuột (floating icon)");
+        _mouseToggle.Checked = Settings.ShowFloatingIcon;
+        _mouseToggle.CheckOnClick = true;
+        _mouseToggle.CheckedChanged += (_, _) =>
+        {
+            Settings.ShowFloatingIcon = _mouseToggle.Checked;
+            if (_mouseToggle.Checked && TextSelectionMonitor == null)
+            {
+                StartTextSelectionMonitor();
+            }
+            else if (!_mouseToggle.Checked)
+            {
+                TextSelectionMonitor?.Dispose();
+                TextSelectionMonitor = null;
+                _floatingIcon?.HideIcon();
+            }
+        };
+        menu.Items.Add(_mouseToggle);
+
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+
+        // --- Exit ---
         var exitItem = new System.Windows.Forms.ToolStripMenuItem("Thoát");
         exitItem.Click += (_, _) => ExitApplication();
         menu.Items.Add(exitItem);
