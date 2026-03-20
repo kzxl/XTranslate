@@ -47,11 +47,58 @@ public class PopupViewModel : ViewModelBase
         set => SetProperty(ref _hasError, value);
     }
 
+    public IReadOnlyList<Language> Languages => LanguageDatabase.Languages;
+
+    private Language _sourceLanguage;
+    public Language SourceLanguage
+    {
+        get => _sourceLanguage;
+        set
+        {
+            if (SetProperty(ref _sourceLanguage, value))
+            {
+                if (!_isInitializing && !string.IsNullOrWhiteSpace(SourceText))
+                    _ = TranslateAsync(SourceText, TargetLanguage?.Code ?? "vi", SourceLanguage?.Code ?? "auto");
+            }
+        }
+    }
+
+    private Language _targetLanguage;
+    public Language TargetLanguage
+    {
+        get => _targetLanguage;
+        set
+        {
+            if (SetProperty(ref _targetLanguage, value))
+            {
+                if (!_isInitializing && !string.IsNullOrWhiteSpace(SourceText))
+                    _ = TranslateAsync(SourceText, TargetLanguage?.Code ?? "vi", SourceLanguage?.Code ?? "auto");
+            }
+        }
+    }
+
+    private bool _isInitializing = true;
     public ICommand CopyCommand { get; }
+    public ICommand SwapLanguagesCommand { get; }
 
     public PopupViewModel(TranslationService translationService)
     {
         _translationService = translationService;
+        
+        _sourceLanguage = Languages.FirstOrDefault(l => l.Code == "auto") ?? Languages[0];
+        _targetLanguage = Languages.FirstOrDefault(l => l.Code == "vi") ?? Languages[0];
+        _isInitializing = false;
+
+        SwapLanguagesCommand = new RelayCommand(() =>
+        {
+            if (SourceLanguage?.Code == "auto") return;
+            var temp = SourceLanguage;
+            SourceLanguage = TargetLanguage;
+            TargetLanguage = temp;
+            
+            // Note: Setting SourceLanguage and TargetLanguage triggers Re-Translate due to Property Setter.
+        });
+
         CopyCommand = new RelayCommand(() =>
         {
             if (!string.IsNullOrEmpty(TranslatedText))
@@ -62,7 +109,7 @@ public class PopupViewModel : ViewModelBase
     /// <summary>
     /// Translates the given text to the target language.
     /// </summary>
-    public async Task TranslateAsync(string text, string targetLang = "vi")
+    public async Task TranslateAsync(string text, string targetLang = "vi", string sourceLang = "auto")
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -76,7 +123,7 @@ public class PopupViewModel : ViewModelBase
 
         try
         {
-            var result = await _translationService.TranslateAsync(SourceText, "auto", targetLang);
+            var result = await _translationService.TranslateAsync(SourceText, sourceLang, targetLang);
 
             if (result.IsSuccess)
             {
