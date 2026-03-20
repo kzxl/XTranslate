@@ -41,6 +41,7 @@ public partial class App : Application
 
         EngineRegistry = new TranslationEngineRegistry();
         EngineRegistry.Register(new GoogleTranslateEngine());
+        EngineRegistry.Register(new MyMemoryTranslateEngine());
 
         TranslationService = new TranslationService(EngineRegistry);
         ClipboardService = new ClipboardService();

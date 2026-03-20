@@ -117,12 +117,14 @@ public class MainViewModel : ViewModelBase
             }
             else
             {
-                StatusText = $"Lỗi: {result.ErrorMessage}";
+                TranslatedText = $"⚠ Lỗi: {result.ErrorMessage}";
+                StatusText = "Dịch thất bại";
             }
         }
         catch (Exception ex)
         {
-            StatusText = $"Lỗi: {ex.Message}";
+            TranslatedText = $"⚠ Lỗi: {ex.Message}";
+            StatusText = "Dịch thất bại";
         }
         finally
         {

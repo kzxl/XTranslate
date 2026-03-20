@@ -20,6 +20,7 @@ public class AppSettings
     public bool MinimizeToTray { get; set; } = true;
     public bool ShowPopupOnHotkey { get; set; } = true;
     public bool ShowFloatingIcon { get; set; } = true;
+    public bool MouseModeRequiresCtrl { get; set; } = false;
     public int PopupAutoCloseSeconds { get; set; } = 5;
 
     // --- Engine ---
