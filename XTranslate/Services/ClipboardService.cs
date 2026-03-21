@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Windows;
 using XTranslate.Core.Interfaces;
 using XTranslate.Native;
@@ -33,9 +34,14 @@ public class ClipboardService : IClipboardService
                 catch { /* ignore */ }
             });
 
-            // Simulate Ctrl+C
+            // Small delay to let clipboard settle
+            await Task.Delay(50);
+
+            // Simulate Ctrl+C — send to the foreground window
             NativeMethods.SendCtrlC();
-            await Task.Delay(100);
+
+            // Wait for app to process Ctrl+C and update clipboard
+            await Task.Delay(150);
 
             // Read clipboard
             string? text = null;
@@ -44,6 +50,8 @@ public class ClipboardService : IClipboardService
                 try { text = Clipboard.GetText(); }
                 catch { text = null; }
             });
+
+            Console.WriteLine($"[Clipboard] Got: '{text?.Substring(0, Math.Min(text?.Length ?? 0, 50))}'");
 
             // Restore original clipboard
             await Application.Current.Dispatcher.InvokeAsync(() =>
@@ -62,7 +70,7 @@ public class ClipboardService : IClipboardService
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[ClipboardService] Error: {ex.Message}");
+            Console.WriteLine($"[ClipboardService] Error: {ex.Message}");
             return null;
         }
     }

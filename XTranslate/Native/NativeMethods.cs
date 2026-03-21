@@ -127,8 +127,9 @@ internal static partial class NativeMethods
 
         if (releaseInputs.Count > 0)
         {
+            Console.WriteLine($"[SendCtrlC] Releasing {releaseInputs.Count} held modifier(s)");
             SendInput((uint)releaseInputs.Count, releaseInputs.ToArray(), Marshal.SizeOf<INPUT>());
-            Thread.Sleep(30);
+            Thread.Sleep(50);
         }
 
         // Send Ctrl+C
@@ -140,7 +141,8 @@ internal static partial class NativeMethods
             MakeKeyInput(VK_CONTROL, KEYEVENTF_KEYUP),
         };
 
-        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+        var sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+        Console.WriteLine($"[SendCtrlC] SendInput returned {sent} (expected 4)");
     }
 
     private static INPUT MakeKeyInput(ushort vk, uint flags) => new()

@@ -6,21 +6,34 @@ namespace XTranslate.Views;
 
 /// <summary>
 /// Fullscreen overlay for screen region selection (OCR capture).
+/// DPI-aware: stores DIP dimensions for pixel-to-DIP conversion.
 /// </summary>
 public partial class ScreenCaptureOverlay : Window
 {
     private System.Windows.Point _startPoint;
     private bool _isDragging;
 
-    /// <summary>
-    /// The selected region in device-independent units.
-    /// </summary>
+    /// <summary>The selected region in DIP coordinates.</summary>
     public Rect SelectedRegion { get; private set; } = Rect.Empty;
+
+    /// <summary>The overlay's width in DIP (for DPI conversion).</summary>
+    public double ScreenDipWidth { get; private set; }
+
+    /// <summary>The overlay's height in DIP (for DPI conversion).</summary>
+    public double ScreenDipHeight { get; private set; }
 
     public ScreenCaptureOverlay(BitmapSource screenshot)
     {
         InitializeComponent();
         ScreenImage.Source = screenshot;
+
+        // Store DIP dimensions once the window is loaded
+        Loaded += (_, _) =>
+        {
+            ScreenDipWidth = ActualWidth;
+            ScreenDipHeight = ActualHeight;
+            Console.WriteLine($"[Overlay] DIP size: {ScreenDipWidth}x{ScreenDipHeight}, Image pixels: {screenshot.PixelWidth}x{screenshot.PixelHeight}");
+        };
     }
 
     private void Canvas_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -63,6 +76,7 @@ public partial class ScreenCaptureOverlay : Window
         if (width > 10 && height > 10)
         {
             SelectedRegion = new Rect(x, y, width, height);
+            Console.WriteLine($"[Overlay] Selected region (DIP): ({x:F0},{y:F0} {width:F0}x{height:F0})");
             DialogResult = true;
         }
         else

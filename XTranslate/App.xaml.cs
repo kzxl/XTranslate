@@ -48,7 +48,7 @@ public partial class App : Application
         _orchestrator = _serviceProvider.GetRequiredService<AppOrchestrator>();
         _orchestrator.Initialize();
 
-        Debug.WriteLine("[XTranslate] App startup complete with DI container.");
+        Console.WriteLine("[XTranslate] App startup complete with DI container.");
     }
 
     private void Application_Exit(object sender, ExitEventArgs e)
@@ -59,7 +59,7 @@ public partial class App : Application
 
     private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        Debug.WriteLine($"[XTranslate] UNHANDLED: {e.Exception}");
+        Console.WriteLine($"[XTranslate] UNHANDLED: {e.Exception}");
         e.Handled = true;
     }
 }

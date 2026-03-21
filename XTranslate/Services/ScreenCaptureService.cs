@@ -1,12 +1,15 @@
+using System.Drawing;
 using System.Windows;
-using System.Windows.Media;
+using System.Windows.Interop;
 using System.Windows.Media.Imaging;
+using WinForms = System.Windows.Forms;
 
 namespace XTranslate.Services;
 
 /// <summary>
 /// Service for capturing a screen region selected by the user.
 /// Shows a fullscreen overlay where user draws a rectangle.
+/// DPI-aware: uses physical pixel dimensions for accurate capture.
 /// </summary>
 public class ScreenCaptureService
 {
@@ -16,7 +19,7 @@ public class ScreenCaptureService
     /// </summary>
     public BitmapSource? CaptureRegion()
     {
-        // First, capture the entire screen
+        // First, capture the entire virtual screen (all monitors)
         var screenBitmap = CaptureFullScreen();
         if (screenBitmap == null) return null;
 
@@ -29,14 +32,17 @@ public class ScreenCaptureService
 
         // Crop the selected region
         var region = overlay.SelectedRegion;
-        var dpiX = screenBitmap.DpiX;
-        var dpiY = screenBitmap.DpiY;
 
-        // Convert from device-independent to pixel coordinates
-        var pixelX = (int)(region.X * dpiX / 96.0);
-        var pixelY = (int)(region.Y * dpiY / 96.0);
-        var pixelWidth = (int)(region.Width * dpiX / 96.0);
-        var pixelHeight = (int)(region.Height * dpiY / 96.0);
+        // The overlay is displayed in DIP coordinates, but the bitmap is in physical pixels.
+        // We need to convert the selection (DIP) to pixel coordinates.
+        // Use PresentationSource DPI but since overlay is closed, use stored DPI.
+        double scaleX = screenBitmap.PixelWidth / overlay.ScreenDipWidth;
+        double scaleY = screenBitmap.PixelHeight / overlay.ScreenDipHeight;
+
+        var pixelX = (int)(region.X * scaleX);
+        var pixelY = (int)(region.Y * scaleY);
+        var pixelWidth = (int)(region.Width * scaleX);
+        var pixelHeight = (int)(region.Height * scaleY);
 
         // Clamp
         pixelX = Math.Max(0, pixelX);
@@ -47,27 +53,32 @@ public class ScreenCaptureService
         if (pixelWidth <= 0 || pixelHeight <= 0)
             return null;
 
-        return new CroppedBitmap(screenBitmap, new System.Windows.Int32Rect(pixelX, pixelY, pixelWidth, pixelHeight));
+        Console.WriteLine($"[Capture] Region DIP: ({region.X:F0},{region.Y:F0} {region.Width:F0}x{region.Height:F0}) → Pixel: ({pixelX},{pixelY} {pixelWidth}x{pixelHeight})");
+
+        return new CroppedBitmap(screenBitmap, new Int32Rect(pixelX, pixelY, pixelWidth, pixelHeight));
     }
 
+    /// <summary>
+    /// Capture the entire virtual screen using physical pixel dimensions.
+    /// </summary>
     private static BitmapSource? CaptureFullScreen()
     {
         try
         {
-            var screenWidth = (int)SystemParameters.VirtualScreenWidth;
-            var screenHeight = (int)SystemParameters.VirtualScreenHeight;
-            var screenLeft = (int)SystemParameters.VirtualScreenLeft;
-            var screenTop = (int)SystemParameters.VirtualScreenTop;
+            // Use System.Windows.Forms for PHYSICAL pixel dimensions (DPI-aware)
+            var virtualScreen = WinForms.SystemInformation.VirtualScreen;
+            Console.WriteLine($"[Capture] VirtualScreen: {virtualScreen.X},{virtualScreen.Y} {virtualScreen.Width}x{virtualScreen.Height} (physical pixels)");
 
-            using var bmp = new System.Drawing.Bitmap(screenWidth, screenHeight);
-            using var g = System.Drawing.Graphics.FromImage(bmp);
-            g.CopyFromScreen(screenLeft, screenTop, 0, 0, new System.Drawing.Size(screenWidth, screenHeight));
+            using var bmp = new Bitmap(virtualScreen.Width, virtualScreen.Height);
+            using var g = Graphics.FromImage(bmp);
+            g.CopyFromScreen(virtualScreen.Left, virtualScreen.Top, 0, 0,
+                new System.Drawing.Size(virtualScreen.Width, virtualScreen.Height));
 
             // Convert System.Drawing.Bitmap to WPF BitmapSource
             var handle = bmp.GetHbitmap();
             try
             {
-                return System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap(
+                return Imaging.CreateBitmapSourceFromHBitmap(
                     handle,
                     IntPtr.Zero,
                     Int32Rect.Empty,
@@ -78,8 +89,9 @@ public class ScreenCaptureService
                 Native.NativeMethods.DeleteObject(handle);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"[Capture] CaptureFullScreen error: {ex.Message}");
             return null;
         }
     }

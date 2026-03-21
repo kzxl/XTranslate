@@ -44,7 +44,7 @@ public class TextSelectionMonitor : IDisposable
 
         _mouseProc = MouseHookCallback;
         _mouseHookId = SetMouseHook(_mouseProc);
-        Debug.WriteLine($"[XTranslate] TextSelectionMonitor started. Hook={_mouseHookId}");
+        Console.WriteLine($"[XTranslate] TextSelectionMonitor started. Hook={_mouseHookId}");
     }
 
     public void Stop()
@@ -109,7 +109,7 @@ public class TextSelectionMonitor : IDisposable
 
         if (NativeMethods.GetCursorPos(out var point))
         {
-            Debug.WriteLine($"[XTranslate] Possible selection at ({point.X}, {point.Y})");
+            Console.WriteLine($"[XTranslate] Possible selection at ({point.X}, {point.Y})");
             PossibleSelection?.Invoke(point.X, point.Y);
         }
     }

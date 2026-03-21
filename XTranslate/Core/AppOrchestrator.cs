@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using XTranslate.Core.Interfaces;
 using XTranslate.Models;
@@ -74,7 +75,7 @@ public class AppOrchestrator
         if (!Settings.StartMinimized)
             _mainWindow.Show();
 
-        Debug.WriteLine("[XTranslate] Startup complete.");
+        Console.WriteLine("[XTranslate] Startup complete.");
     }
 
     // --- Text Selection Monitor ---
@@ -84,17 +85,23 @@ public class AppOrchestrator
         _textSelectionMonitor = new TextSelectionMonitor();
         _textSelectionMonitor.PossibleSelection += async (x, y) =>
         {
+            Console.WriteLine($"[FloatingIcon] PossibleSelection at ({x}, {y})");
             if (Settings.MouseModeRequiresCtrl &&
                 !System.Windows.Input.Keyboard.Modifiers.HasFlag(System.Windows.Input.ModifierKeys.Control))
+            {
+                Console.WriteLine("[FloatingIcon] Skipped — requires Ctrl");
                 return;
+            }
 
             _textSelectionMonitor.IsEnabled = false;
             var text = await _clipboardService.GetSelectedTextAsync();
             _textSelectionMonitor.IsEnabled = true;
+            Console.WriteLine($"[FloatingIcon] Clipboard text: '{text?.Substring(0, Math.Min(text?.Length ?? 0, 50))}'");
 
             if (!string.IsNullOrWhiteSpace(text))
             {
                 Application.Current.Dispatcher.Invoke(() => _floatingIcon?.ShowAt(x, y, text.Trim()));
+                Console.WriteLine("[FloatingIcon] ShowAt called");
             }
         };
         _textSelectionMonitor.SelectionCleared += () =>
@@ -138,17 +145,17 @@ public class AppOrchestrator
         // Hotkey 1: Popup
         var hotkeyPopup = Settings.TranslateHotkey;
         bool okPopup = _hotkeyService.RegisterHotkey(hotkeyPopup, 1);
-        Debug.WriteLine($"[XTranslate] RegisterHotKey Popup ({hotkeyPopup}) = {okPopup}");
+        Console.WriteLine($"[XTranslate] RegisterHotKey Popup ({hotkeyPopup}) = {okPopup}");
 
         // Hotkey 2: Main Window
         var hotkeyMain = Settings.TranslateMainWindowHotkey;
         bool okMain = _hotkeyService.RegisterHotkey(hotkeyMain, 2);
-        Debug.WriteLine($"[XTranslate] RegisterHotKey Main ({hotkeyMain}) = {okMain}");
+        Console.WriteLine($"[XTranslate] RegisterHotKey Main ({hotkeyMain}) = {okMain}");
 
         // Hotkey 3: OCR
         var hotkeyOcr = Settings.OcrHotkey;
         bool okOcr = _hotkeyService.RegisterHotkey(hotkeyOcr, 3);
-        Debug.WriteLine($"[XTranslate] RegisterHotKey OCR ({hotkeyOcr}) = {okOcr}");
+        Console.WriteLine($"[XTranslate] RegisterHotKey OCR ({hotkeyOcr}) = {okOcr}");
 
         if (!okPopup)
         {
@@ -186,7 +193,7 @@ public class AppOrchestrator
 
     private async void OnHotkeyPressed(int hotkeyId)
     {
-        Debug.WriteLine($"[XTranslate] Hotkey pressed: ID={hotkeyId}");
+        Console.WriteLine($"[XTranslate] Hotkey pressed: ID={hotkeyId}");
         try
         {
             if (_textSelectionMonitor != null)
@@ -202,6 +209,7 @@ public class AppOrchestrator
             }
 
             var text = await _clipboardService.GetSelectedTextAsync() ?? "";
+            Console.WriteLine($"[Hotkey] GetSelectedText result: '{text?.Substring(0, Math.Min(text?.Length ?? 0, 50))}'");
 
             if (_textSelectionMonitor != null)
                 _textSelectionMonitor.IsEnabled = true;
@@ -209,7 +217,14 @@ public class AppOrchestrator
             if (hotkeyId == 1) // Popup (Ctrl+Q)
             {
                 if (!string.IsNullOrWhiteSpace(text))
+                {
+                    Console.WriteLine("[Hotkey] Showing popup for Ctrl+Q...");
                     await ShowTranslationPopup(text);
+                }
+                else
+                {
+                    Console.WriteLine("[Hotkey] No text selected for popup");
+                }
             }
             else if (hotkeyId == 2) // Main Window (Ctrl+Enter)
             {
@@ -223,7 +238,7 @@ public class AppOrchestrator
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[XTranslate] Hotkey error: {ex.Message}");
+            Console.WriteLine($"[XTranslate] Hotkey error: {ex.Message}");
             if (_textSelectionMonitor != null)
                 _textSelectionMonitor.IsEnabled = true;
         }
@@ -233,28 +248,88 @@ public class AppOrchestrator
 
     private async Task PerformOcrTranslation()
     {
+        Console.WriteLine("[OCR] PerformOcrTranslation called (hotkey)");
+
         if (!_ocrEngine.IsAvailable)
         {
+            Console.WriteLine("[OCR] Engine not available!");
             MessageBox.Show(
                 "OCR không khả dụng trên hệ thống này.\nCần Windows 10 phiên bản 2004 trở lên.",
                 "XTranslate — OCR", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
+        Console.WriteLine($"[OCR] Engine available. Languages: {string.Join(", ", _ocrEngine.AvailableLanguages)}");
+
         try
         {
-            var bitmap = await Application.Current.Dispatcher.InvokeAsync(() =>
-                _screenCaptureService.CaptureRegion());
+            // Step 1: Hide main window to get clean screenshot
+            bool wasVisible = false;
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                if (_mainWindow != null && _mainWindow.IsVisible)
+                {
+                    wasVisible = true;
+                    _mainWindow.Hide();
+                }
+            });
 
-            if (bitmap == null) return;
+            // Wait for window to fully hide
+            await Task.Delay(250);
 
+            // Step 2: Capture screen region (shows overlay for user to select)
+            Console.WriteLine("[OCR] Step 1: Capturing screen region...");
+            BitmapSource? bitmap = null;
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    bitmap = _screenCaptureService.CaptureRegion();
+                    Console.WriteLine($"[OCR] CaptureRegion returned: {(bitmap != null ? $"{bitmap.PixelWidth}x{bitmap.PixelHeight}" : "null")}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[OCR] CaptureRegion exception: {ex}");
+                }
+            });
+
+            // Restore main window
+            if (wasVisible)
+            {
+                await Application.Current.Dispatcher.InvokeAsync(() => _mainWindow?.Show());
+            }
+
+            if (bitmap == null)
+            {
+                Console.WriteLine("[OCR] Bitmap is null — user cancelled or capture failed");
+                return;
+            }
+
+            // Step 3: Run OCR
+            Console.WriteLine("[OCR] Step 2: Running OCR...");
             var text = await _ocrEngine.RecognizeAsync(bitmap);
+            Console.WriteLine($"[OCR] OCR result: '{text}'");
+
             if (!string.IsNullOrWhiteSpace(text))
+            {
+                // Hotkey flow → show popup
+                Console.WriteLine("[OCR] Step 3: Showing translation popup...");
                 await ShowTranslationPopup(text.Trim());
+            }
+            else
+            {
+                Console.WriteLine("[OCR] No text recognized — showing message");
+                await Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    MessageBox.Show(
+                        "Không nhận dạng được văn bản nào.\nThử chọn vùng lớn hơn hoặc vùng có chữ rõ ràng.",
+                        "XTranslate — OCR", MessageBoxButton.OK, MessageBoxImage.Information);
+                });
+            }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[XTranslate] OCR error: {ex.Message}");
+            Console.WriteLine($"[XTranslate] OCR error: {ex}");
         }
     }
 
@@ -262,12 +337,23 @@ public class AppOrchestrator
 
     private async Task ShowTranslationPopup(string text)
     {
+        Console.WriteLine($"[Popup] ShowTranslationPopup called: '{text.Substring(0, Math.Min(text.Length, 50))}'");
         await Application.Current.Dispatcher.InvokeAsync(async () =>
         {
-            var vm = _popupViewModelFactory();
-            var popup = new PopupWindow(vm);
-            popup.Show();
-            await vm.TranslateAsync(text, Settings.DefaultTargetLanguage);
+            try
+            {
+                var vm = _popupViewModelFactory();
+                var popup = new PopupWindow(vm);
+                popup.Show();
+                popup.Activate();
+                Console.WriteLine($"[Popup] Window shown at ({popup.Left}, {popup.Top})");
+                await vm.TranslateAsync(text, Settings.DefaultTargetLanguage);
+                Console.WriteLine($"[Popup] Translation done: '{vm.TranslatedText?.Substring(0, Math.Min(vm.TranslatedText?.Length ?? 0, 50))}'");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Popup] Error: {ex}");
+            }
         });
     }
 

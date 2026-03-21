@@ -73,15 +73,45 @@ public partial class MainWindow : Window
             return;
         }
 
-        var captureService = App.Services.GetRequiredService<ScreenCaptureService>();
-        var bitmap = captureService.CaptureRegion();
-        if (bitmap == null) return;
+        // Ẩn main window để chụp màn hình sạch
+        var wasVisible = IsVisible;
+        if (wasVisible) Hide();
 
-        var text = await ocrEngine.RecognizeAsync(bitmap);
-        if (!string.IsNullOrWhiteSpace(text))
+        // Delay nhỏ để window ẩn hoàn toàn
+        await Task.Delay(200);
+
+        try
         {
-            ViewModel.SourceText = text.Trim();
-            await ViewModel.TranslateAsync();
+            var captureService = App.Services.GetRequiredService<ScreenCaptureService>();
+            var bitmap = captureService.CaptureRegion();
+
+            // Hiện lại main window trước
+            if (wasVisible) Show();
+
+            if (bitmap == null) return;
+
+            Console.WriteLine($"[OCR-MainForm] Captured {bitmap.PixelWidth}x{bitmap.PixelHeight}");
+
+            ViewModel.StatusText = "Đang nhận dạng văn bản (OCR)...";
+            var text = await ocrEngine.RecognizeAsync(bitmap);
+            Console.WriteLine($"[OCR-MainForm] Recognized: '{text}'");
+
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                // Đổ text vào main form SourceText → translate 
+                ViewModel.SourceText = text.Trim();
+                await ViewModel.TranslateAsync();
+            }
+            else
+            {
+                ViewModel.StatusText = "OCR không nhận dạng được văn bản nào.";
+            }
+        }
+        catch (Exception ex)
+        {
+            if (wasVisible && !IsVisible) Show();
+            Console.WriteLine($"[OCR-MainForm] Error: {ex}");
+            ViewModel.StatusText = $"OCR lỗi: {ex.Message}";
         }
     }
 }
