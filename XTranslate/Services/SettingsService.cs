@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using XTranslate.Core.Interfaces;
 using XTranslate.Models;
 
 namespace XTranslate.Services;
@@ -7,7 +8,7 @@ namespace XTranslate.Services;
 /// <summary>
 /// Loads and saves application settings as JSON in %AppData%/XTranslate.
 /// </summary>
-public class SettingsService
+public class SettingsService : ISettingsService
 {
     private static readonly string SettingsFolder =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XTranslate");

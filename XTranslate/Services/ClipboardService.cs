@@ -1,84 +1,69 @@
-using System.Runtime.InteropServices;
+using System.Diagnostics;
 using System.Windows;
+using XTranslate.Core.Interfaces;
 using XTranslate.Native;
 
 namespace XTranslate.Services;
 
 /// <summary>
-/// Gets selected text from the foreground application by simulating Ctrl+C.
-/// Saves and restores the clipboard content.
+/// Captures selected text from any application using clipboard automation.
 /// </summary>
-public class ClipboardService
+public class ClipboardService : IClipboardService
 {
     /// <summary>
-    /// Captures the currently selected text in the foreground window.
+    /// Captures the currently selected text by simulating Ctrl+C.
     /// </summary>
-    public async Task<string> GetSelectedTextAsync()
+    public async Task<string?> GetSelectedTextAsync()
     {
-        string? previousText = null;
+        string? original = null;
 
-        await RunOnSTAThread(() =>
+        try
         {
-            if (Clipboard.ContainsText())
-                previousText = Clipboard.GetText();
-            Clipboard.Clear();
-        });
-
-        // 1. Gửi lệnh Copy mạnh mẽ nhất của WinForms
-        // Không quan tâm state bàn phím hiện tại, thư viện này tự route message qua OS pipe rất chuẩn.
-        await RunOnSTAThread(() =>
-        {
-            try 
+            // Save current clipboard content
+            await Application.Current.Dispatcher.InvokeAsync(() =>
             {
-                System.Windows.Forms.SendKeys.Flush();
-                System.Windows.Forms.SendKeys.SendWait("^c");
-                System.Windows.Forms.SendKeys.Flush();
-            } 
-            catch { }
-        });
-
-        // 2. Chờ dữ liệu vào Clipboard (max 20 lần = ~ 600ms)
-        string selectedText = "";
-        for (int i = 0; i < 20; i++) 
-        {
-            await Task.Delay(30);
-            await RunOnSTAThread(() =>
-            {
-                if (Clipboard.ContainsText())
-                    selectedText = Clipboard.GetText();
+                try { original = Clipboard.GetText(); }
+                catch { original = null; }
             });
 
-            if (!string.IsNullOrEmpty(selectedText))
-                break;
+            // Clear clipboard
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                try { Clipboard.Clear(); }
+                catch { /* ignore */ }
+            });
+
+            // Simulate Ctrl+C
+            NativeMethods.SendCtrlC();
+            await Task.Delay(100);
+
+            // Read clipboard
+            string? text = null;
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                try { text = Clipboard.GetText(); }
+                catch { text = null; }
+            });
+
+            // Restore original clipboard
+            await Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    if (!string.IsNullOrEmpty(original))
+                        Clipboard.SetText(original);
+                    else
+                        Clipboard.Clear();
+                }
+                catch { /* ignore */ }
+            });
+
+            return text;
         }
-
-        // 3. Khôi phục lại dữ liệu nếu có
-        await RunOnSTAThread(() =>
+        catch (Exception ex)
         {
-            if (previousText != null && previousText != selectedText)
-                Clipboard.SetText(previousText);
-            else if (previousText == null)
-                Clipboard.Clear();
-        });
-
-        return selectedText;
-    }
-
-    private static Task RunOnSTAThread(Action action)
-    {
-        if (Application.Current?.Dispatcher != null)
-        {
-            return Application.Current.Dispatcher.InvokeAsync(action).Task;
+            Debug.WriteLine($"[ClipboardService] Error: {ex.Message}");
+            return null;
         }
-        
-        var tcs = new TaskCompletionSource();
-        var thread = new Thread(() =>
-        {
-            action();
-            tcs.SetResult();
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        return tcs.Task;
     }
 }

@@ -10,7 +10,8 @@ public class AppSettings
     // --- Hotkeys ---
     public Keys TranslateHotkey { get; set; } = Keys.Control | Keys.Q;
     public Keys TranslateMainWindowHotkey { get; set; } = Keys.Control | Keys.Enter;
-    
+    public Keys OcrHotkey { get; set; } = Keys.Control | Keys.Shift | Keys.Q;
+
     // --- Languages ---
     public string DefaultSourceLanguage { get; set; } = "auto";
     public string DefaultTargetLanguage { get; set; } = "vi";
@@ -26,6 +27,10 @@ public class AppSettings
 
     // --- Engine ---
     public string ActiveEngineName { get; set; } = "Google Translate";
+
+    // --- OCR ---
+    public bool OcrEnabled { get; set; } = true;
+    public string OcrLanguage { get; set; } = "en"; // Windows OCR language tag
 
     // --- Window State ---
     public double WindowLeft { get; set; } = double.NaN;

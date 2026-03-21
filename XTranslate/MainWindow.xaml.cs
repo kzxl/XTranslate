@@ -1,7 +1,12 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
+using Microsoft.Extensions.DependencyInjection;
+using XTranslate.Core;
+using XTranslate.Core.Interfaces;
+using XTranslate.Services;
 using XTranslate.ViewModels;
+using XTranslate.Views;
 
 namespace XTranslate;
 
@@ -15,25 +20,20 @@ public partial class MainWindow : Window
         DataContext = viewModel;
     }
 
-    /// <summary>
-    /// Ctrl+Enter: call translate directly, bypassing command CanExecute.
-    /// </summary>
     private async void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
     {
         if (e.Key == Key.Return && Keyboard.Modifiers == ModifierKeys.Control)
         {
             e.Handled = true;
-
             if (!string.IsNullOrWhiteSpace(ViewModel.SourceText) && !ViewModel.IsTranslating)
-            {
                 await ViewModel.TranslateAsync();
-            }
         }
     }
 
     private void Window_Closing(object sender, CancelEventArgs e)
     {
-        if (App.Instance.Settings.MinimizeToTray)
+        var settings = App.Services.GetRequiredService<ISettingsService>();
+        if (settings.Settings.MinimizeToTray)
         {
             e.Cancel = true;
             Hide();
@@ -42,23 +42,46 @@ public partial class MainWindow : Window
 
     private void Window_StateChanged(object sender, EventArgs e)
     {
-        if (WindowState == System.Windows.WindowState.Minimized && App.Instance.Settings.MinimizeToTray)
+        var settings = App.Services.GetRequiredService<ISettingsService>();
+        if (WindowState == WindowState.Minimized && settings.Settings.MinimizeToTray)
         {
             Hide();
-            WindowState = System.Windows.WindowState.Normal;
+            WindowState = WindowState.Normal;
         }
     }
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
-        var settingsWindow = new Views.SettingsWindow(App.Instance.SettingsService)
-        {
-            Owner = this
-        };
+        var settingsService = App.Services.GetRequiredService<ISettingsService>();
+        var registry = App.Services.GetRequiredService<TranslationEngineRegistry>();
+        var ocrEngine = App.Services.GetRequiredService<IOcrEngine>();
+        var settingsWindow = new SettingsWindow(settingsService, registry, ocrEngine) { Owner = this };
         if (settingsWindow.ShowDialog() == true)
         {
-            // Re-register hotkey if changed
-            App.Instance.ReRegisterHotkey();
+            var orchestrator = App.Services.GetRequiredService<AppOrchestrator>();
+            orchestrator.ReRegisterHotkey();
+        }
+    }
+
+    private async void OcrButton_Click(object sender, RoutedEventArgs e)
+    {
+        var ocrEngine = App.Services.GetRequiredService<IOcrEngine>();
+        if (!ocrEngine.IsAvailable)
+        {
+            MessageBox.Show("OCR không khả dụng trên hệ thống này.",
+                "XTranslate — OCR", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var captureService = App.Services.GetRequiredService<ScreenCaptureService>();
+        var bitmap = captureService.CaptureRegion();
+        if (bitmap == null) return;
+
+        var text = await ocrEngine.RecognizeAsync(bitmap);
+        if (!string.IsNullOrWhiteSpace(text))
+        {
+            ViewModel.SourceText = text.Trim();
+            await ViewModel.TranslateAsync();
         }
     }
 }

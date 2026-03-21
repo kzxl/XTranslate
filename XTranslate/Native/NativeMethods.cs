@@ -85,6 +85,11 @@ internal static partial class NativeMethods
     public const int WM_LBUTTONDOWN = 0x0201;
     public const int WM_LBUTTONUP = 0x0202;
 
+    // --- GDI Object Cleanup ---
+    [DllImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool DeleteObject(IntPtr hObject);
+
     // --- Low-level Mouse Hook ---
     public const int WH_MOUSE_LL = 14;
 
@@ -102,4 +107,48 @@ internal static partial class NativeMethods
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     public static extern IntPtr GetModuleHandle(string lpModuleName);
+
+    // --- Helper: Simulate Ctrl+C ---
+
+    /// <summary>
+    /// Simulate Ctrl+C keystroke to copy selected text to clipboard.
+    /// Releases any held modifier keys first to avoid conflicts.
+    /// </summary>
+    public static void SendCtrlC()
+    {
+        // Release modifier keys that might be held (from hotkey)
+        var releaseInputs = new List<INPUT>();
+        if ((GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0)
+            releaseInputs.Add(MakeKeyInput(VK_CONTROL, KEYEVENTF_KEYUP));
+        if ((GetAsyncKeyState(VK_SHIFT) & 0x8000) != 0)
+            releaseInputs.Add(MakeKeyInput(VK_SHIFT, KEYEVENTF_KEYUP));
+        if ((GetAsyncKeyState(VK_MENU) & 0x8000) != 0)
+            releaseInputs.Add(MakeKeyInput(VK_MENU, KEYEVENTF_KEYUP));
+
+        if (releaseInputs.Count > 0)
+        {
+            SendInput((uint)releaseInputs.Count, releaseInputs.ToArray(), Marshal.SizeOf<INPUT>());
+            Thread.Sleep(30);
+        }
+
+        // Send Ctrl+C
+        var inputs = new INPUT[]
+        {
+            MakeKeyInput(VK_CONTROL, 0),
+            MakeKeyInput(VK_C, 0),
+            MakeKeyInput(VK_C, KEYEVENTF_KEYUP),
+            MakeKeyInput(VK_CONTROL, KEYEVENTF_KEYUP),
+        };
+
+        SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+    }
+
+    private static INPUT MakeKeyInput(ushort vk, uint flags) => new()
+    {
+        Type = INPUT_KEYBOARD,
+        Union = new INPUTUNION
+        {
+            Keyboard = new KEYBDINPUT { Vk = vk, Flags = flags }
+        }
+    };
 }
