@@ -53,7 +53,7 @@ public class ScreenCaptureService
         if (pixelWidth <= 0 || pixelHeight <= 0)
             return null;
 
-        Console.WriteLine($"[Capture] Region DIP: ({region.X:F0},{region.Y:F0} {region.Width:F0}x{region.Height:F0}) → Pixel: ({pixelX},{pixelY} {pixelWidth}x{pixelHeight})");
+        Log.Debug($"[Capture] Region DIP: ({region.X:F0},{region.Y:F0} {region.Width:F0}x{region.Height:F0}) → Pixel: ({pixelX},{pixelY} {pixelWidth}x{pixelHeight})");
 
         return new CroppedBitmap(screenBitmap, new Int32Rect(pixelX, pixelY, pixelWidth, pixelHeight));
     }
@@ -67,7 +67,7 @@ public class ScreenCaptureService
         {
             // Use System.Windows.Forms for PHYSICAL pixel dimensions (DPI-aware)
             var virtualScreen = WinForms.SystemInformation.VirtualScreen;
-            Console.WriteLine($"[Capture] VirtualScreen: {virtualScreen.X},{virtualScreen.Y} {virtualScreen.Width}x{virtualScreen.Height} (physical pixels)");
+            Log.Debug($"[Capture] VirtualScreen: {virtualScreen.X},{virtualScreen.Y} {virtualScreen.Width}x{virtualScreen.Height} (physical pixels)");
 
             using var bmp = new Bitmap(virtualScreen.Width, virtualScreen.Height);
             using var g = Graphics.FromImage(bmp);
@@ -91,7 +91,7 @@ public class ScreenCaptureService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[Capture] CaptureFullScreen error: {ex.Message}");
+            Log.Debug($"[Capture] CaptureFullScreen error: {ex.Message}");
             return null;
         }
     }

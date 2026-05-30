@@ -25,8 +25,20 @@ public class AppSettings
     public bool MouseModeRequiresCtrl { get; set; } = false;
     public int PopupAutoCloseSeconds { get; set; } = 5;
 
+    /// <summary>
+    /// Automatically translate in the main window after the user stops typing
+    /// (QTranslate-style instant translation). Debounced to avoid spamming the API.
+    /// </summary>
+    public bool InstantTranslate { get; set; } = true;
+
     // --- Engine ---
     public string ActiveEngineName { get; set; } = "Google Translate";
+
+    /// <summary>
+    /// When the active engine fails, automatically retry with the other
+    /// registered engines (QTranslate-style multi-service reliability).
+    /// </summary>
+    public bool EnableEngineFallback { get; set; } = true;
 
     // --- OCR ---
     public bool OcrEnabled { get; set; } = true;

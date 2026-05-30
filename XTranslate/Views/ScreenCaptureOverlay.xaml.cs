@@ -32,7 +32,7 @@ public partial class ScreenCaptureOverlay : Window
         {
             ScreenDipWidth = ActualWidth;
             ScreenDipHeight = ActualHeight;
-            Console.WriteLine($"[Overlay] DIP size: {ScreenDipWidth}x{ScreenDipHeight}, Image pixels: {screenshot.PixelWidth}x{screenshot.PixelHeight}");
+            Log.Debug($"[Overlay] DIP size: {ScreenDipWidth}x{ScreenDipHeight}, Image pixels: {screenshot.PixelWidth}x{screenshot.PixelHeight}");
         };
     }
 
@@ -76,7 +76,7 @@ public partial class ScreenCaptureOverlay : Window
         if (width > 10 && height > 10)
         {
             SelectedRegion = new Rect(x, y, width, height);
-            Console.WriteLine($"[Overlay] Selected region (DIP): ({x:F0},{y:F0} {width:F0}x{height:F0})");
+            Log.Debug($"[Overlay] Selected region (DIP): ({x:F0},{y:F0} {width:F0}x{height:F0})");
             DialogResult = true;
         }
         else

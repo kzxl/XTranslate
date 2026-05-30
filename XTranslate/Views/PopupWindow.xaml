@@ -36,6 +36,12 @@
                     <TextBlock Text="{Binding DetectedLanguage, StringFormat='  •  {0}'}" FontSize="11"
                                Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
                 </StackPanel>
+                <Button Content="✕" HorizontalAlignment="Right" VerticalAlignment="Center"
+                        Style="{StaticResource ModernButton}"
+                        Click="CloseButton_Click"
+                        Padding="7,2" FontSize="11" Height="24"
+                        ToolTip="Đóng (Esc)"
+                        AutomationProperties.Name="Đóng popup" />
             </Grid>
 
             <!-- Source text (truncated) -->
@@ -125,9 +131,17 @@
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="📋 Copy" Style="{StaticResource ModernButton}"
-                            Command="{Binding CopyCommand}"
-                            Padding="10,3" FontSize="11" Height="28" />
+                    <Button Content="🔊" Style="{StaticResource ModernButton}"
+                            Command="{Binding SpeakCommand}"
+                            Padding="9,3" FontSize="12" Height="28" Margin="0,0,6,0"
+                            ToolTip="Phát âm bản dịch"
+                            AutomationProperties.Name="Phát âm bản dịch"
+                            Visibility="{Binding CanSpeak, Converter={StaticResource BoolToVis}}" />
+                    <Button x:Name="CopyButton" Content="📋 Copy" Style="{StaticResource ModernButton}"
+                            Click="CopyButton_Click"
+                            Padding="10,3" FontSize="11" Height="28"
+                            ToolTip="Sao chép bản dịch"
+                            AutomationProperties.Name="Sao chép bản dịch" />
                     <TextBlock Text="Esc đóng" FontSize="10"
                                Foreground="{StaticResource TextMutedBrush}"
                                VerticalAlignment="Center" Margin="10,0,0,0" />

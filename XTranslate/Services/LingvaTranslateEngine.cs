@@ -1,19 +1,22 @@
 using System.Net.Http;
 using System.Text.Json;
-using System.Web;
 using XTranslate.Helpers;
 using XTranslate.Models;
 
 namespace XTranslate.Services;
 
 /// <summary>
-/// MyMemory Translation API — free, no API key required.
-/// https://mymemory.translated.net/doc/spec.php
+/// Lingva Translate — a free, privacy-friendly Google Translate frontend that
+/// requires no API key. https://github.com/thedaviddelta/lingva-translate
+/// Useful as an additional engine and fallback target.
 /// </summary>
-public class MyMemoryTranslateEngine : ITranslationEngine
+public class LingvaTranslateEngine : ITranslationEngine
 {
-    public string Name => "MyMemory";
+    public string Name => "Lingva";
     public IReadOnlyList<Language> SupportedLanguages => LanguageDatabase.Languages;
+
+    // Public instance. The path format is /api/v1/{source}/{target}/{text}.
+    private const string BaseUrl = "https://lingva.ml/api/v1";
 
     private readonly HttpClient _httpClient = HttpClientProvider.Shared;
 
@@ -25,25 +28,24 @@ public class MyMemoryTranslateEngine : ITranslationEngine
 
         try
         {
-            var src = sourceLang == "auto" ? "autodetect" : sourceLang;
-            var langPair = $"{src}|{targetLang}";
-            var encoded = HttpUtility.UrlEncode(text);
-            var url = $"https://api.mymemory.translated.net/get?q={encoded}&langpair={langPair}";
+            var src = string.IsNullOrEmpty(sourceLang) || sourceLang == "autodetect" ? "auto" : sourceLang;
+            // Lingva expects the text as a URL path segment.
+            var encoded = Uri.EscapeDataString(text);
+            var url = $"{BaseUrl}/{src}/{targetLang}/{encoded}";
 
             var response = await _httpClient.GetStringAsync(url, ct);
-            var json = JsonDocument.Parse(response);
+            using var json = JsonDocument.Parse(response);
             var root = json.RootElement;
 
-            var translated = "";
+            var translated = root.TryGetProperty("translation", out var t)
+                ? t.GetString() ?? ""
+                : "";
+
             var detectedLang = sourceLang;
-
-            if (root.TryGetProperty("responseData", out var data))
+            if (root.TryGetProperty("info", out var info) &&
+                info.TryGetProperty("detectedSource", out var det))
             {
-                if (data.TryGetProperty("translatedText", out var trans))
-                    translated = trans.GetString() ?? "";
-
-                if (data.TryGetProperty("detectedLanguage", out var detected))
-                    detectedLang = detected.GetString() ?? sourceLang;
+                detectedLang = det.GetString() ?? sourceLang;
             }
 
             return new TranslationResult
@@ -54,7 +56,7 @@ public class MyMemoryTranslateEngine : ITranslationEngine
                 TargetLanguageCode = targetLang,
                 DetectedLanguageCode = detectedLang,
                 EngineName = Name,
-                IsSuccess = true
+                IsSuccess = !string.IsNullOrEmpty(translated)
             };
         }
         catch (Exception ex)
@@ -62,6 +64,7 @@ public class MyMemoryTranslateEngine : ITranslationEngine
             return new TranslationResult
             {
                 SourceText = text, TranslatedText = "", EngineName = Name,
+                SourceLanguageCode = sourceLang, TargetLanguageCode = targetLang,
                 IsSuccess = false, ErrorMessage = ex.Message
             };
         }

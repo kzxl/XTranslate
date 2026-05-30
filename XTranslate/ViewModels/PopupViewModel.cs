@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using XTranslate.Core.Interfaces;
 using XTranslate.Helpers;
 using XTranslate.Models;
 using XTranslate.Services;
@@ -11,6 +12,8 @@ namespace XTranslate.ViewModels;
 public class PopupViewModel : ViewModelBase
 {
     private readonly TranslationService _translationService;
+    private readonly ITtsService? _ttsService;
+    private readonly HistoryService? _historyService;
 
     private string _sourceText = "";
     public string SourceText
@@ -80,12 +83,18 @@ public class PopupViewModel : ViewModelBase
     }
 
     private bool _isInitializing = true;
+    private CancellationTokenSource? _cts;
     public ICommand CopyCommand { get; }
     public ICommand SwapLanguagesCommand { get; }
+    public ICommand SpeakCommand { get; }
 
-    public PopupViewModel(TranslationService translationService)
+    public bool CanSpeak => _ttsService?.IsAvailable ?? false;
+
+    public PopupViewModel(TranslationService translationService, ITtsService? ttsService = null, HistoryService? historyService = null)
     {
         _translationService = translationService;
+        _ttsService = ttsService;
+        _historyService = historyService;
         
         _sourceLanguage = Languages.FirstOrDefault(l => l.Code == "auto") ?? Languages[0];
         _targetLanguage = Languages.FirstOrDefault(l => l.Code == "vi") ?? Languages[0];
@@ -117,6 +126,23 @@ public class PopupViewModel : ViewModelBase
             if (!string.IsNullOrEmpty(TranslatedText))
                 System.Windows.Clipboard.SetText(TranslatedText);
         });
+
+        SpeakCommand = new RelayCommand(
+            () => _ = _ttsService?.SpeakAsync(TranslatedText, TargetLanguage?.Code),
+            () => CanSpeak && !string.IsNullOrEmpty(TranslatedText));
+    }
+
+    /// <summary>
+    /// Puts the popup into a transient busy state (e.g. while OCR is running)
+    /// so the user gets immediate feedback before any text is available.
+    /// </summary>
+    public void SetBusy(string message)
+    {
+        SourceText = message;
+        TranslatedText = "";
+        DetectedLanguage = "";
+        HasError = false;
+        IsTranslating = true;
     }
 
     /// <summary>
@@ -130,6 +156,13 @@ public class PopupViewModel : ViewModelBase
             return;
         }
 
+        // Cancel any in-flight translation so a rapid language/text change does
+        // not race an older request whose result would overwrite the newer one.
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
         SourceText = text.Trim();
         IsTranslating = true;
         HasError = false;
@@ -138,7 +171,10 @@ public class PopupViewModel : ViewModelBase
     retry:
         try
         {
-            var result = await _translationService.TranslateAsync(SourceText, sourceLang, targetLang);
+            var result = await _translationService.TranslateAsync(SourceText, sourceLang, targetLang, token);
+
+            if (token.IsCancellationRequested)
+                return;
 
             if (result.IsSuccess)
             {
@@ -168,12 +204,20 @@ public class PopupViewModel : ViewModelBase
                 _lastDetectedLangCode = result.DetectedLanguageCode;
                 var detectedObj = LanguageDatabase.FindByCode(result.DetectedLanguageCode);
                 DetectedLanguage = detectedObj?.Name ?? result.DetectedLanguageCode;
+
+                // Record into shared translation history.
+                _historyService?.Add(result);
             }
             else
             {
                 TranslatedText = result.ErrorMessage ?? "Translation failed";
                 HasError = true;
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer request — ignore.
+            return;
         }
         catch (Exception ex)
         {
@@ -182,7 +226,8 @@ public class PopupViewModel : ViewModelBase
         }
         finally
         {
-            IsTranslating = false;
+            if (!token.IsCancellationRequested)
+                IsTranslating = false;
         }
     }
 }

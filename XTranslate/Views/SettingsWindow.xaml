@@ -83,6 +83,9 @@
                           Margin="0,0,0,10" />
                 <CheckBox x:Name="chkShowFloatingIcon" Content="Hiện icon 🌐 khi chọn text (floating icon)"
                           Margin="0,0,0,10" />
+                <CheckBox x:Name="chkInstantTranslate" Content="Dịch tức thì khi gõ (tự dịch sau khi ngừng gõ)"
+                          Margin="0,0,0,10"
+                          ToolTip="Cửa sổ chính tự động dịch ~0.6s sau khi bạn ngừng gõ" />
 
                 <Rectangle Height="1" Fill="#FF1E293B" Margin="0,8,0,18" />
 
@@ -121,6 +124,11 @@
                           ItemContainerStyle="{StaticResource DarkComboBoxItem}"
                           Width="240" HorizontalAlignment="Left"
                           Margin="0,0,0,14" />
+
+                <CheckBox x:Name="chkEngineFallback"
+                          Content="Tự động thử engine khác khi dịch lỗi"
+                          Margin="0,0,0,14"
+                          ToolTip="Khi engine đang chọn gặp lỗi, tự động dùng engine còn lại" />
 
                 <TextBlock Text="Popup tự đóng sau (giây, 0 = không tự đóng)" FontSize="13"
                            Foreground="#FF94A3B8" Margin="0,0,0,6" />

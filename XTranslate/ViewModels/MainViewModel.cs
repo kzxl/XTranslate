@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using XTranslate.Core.Interfaces;
 using XTranslate.Helpers;
 using XTranslate.Models;
 using XTranslate.Services;
@@ -11,6 +12,8 @@ namespace XTranslate.ViewModels;
 public class MainViewModel : ViewModelBase
 {
     private readonly TranslationService _translationService;
+    private readonly ITtsService? _ttsService;
+    private readonly HistoryService? _historyService;
 
     // --- Bindable Properties ---
 
@@ -61,6 +64,7 @@ public class MainViewModel : ViewModelBase
     }
 
     private string _lastDetectedLangCode = "";
+    private CancellationTokenSource? _cts;
 
     public int CharacterCount => SourceText?.Length ?? 0;
 
@@ -73,10 +77,21 @@ public class MainViewModel : ViewModelBase
     public ICommand SwapLanguagesCommand { get; }
     public ICommand CopyResultCommand { get; }
     public ICommand ClearCommand { get; }
+    public ICommand SpeakSourceCommand { get; }
+    public ICommand SpeakResultCommand { get; }
+    public ICommand UseHistoryItemCommand { get; }
+    public ICommand ClearHistoryCommand { get; }
 
-    public MainViewModel(TranslationService translationService)
+    public bool CanSpeak => _ttsService?.IsAvailable ?? false;
+
+    /// <summary>History entries for the side panel (null when no history service).</summary>
+    public System.Collections.ObjectModel.ObservableCollection<HistoryItem>? History => _historyService?.Items;
+
+    public MainViewModel(TranslationService translationService, ITtsService? ttsService = null, HistoryService? historyService = null)
     {
         _translationService = translationService;
+        _ttsService = ttsService;
+        _historyService = historyService;
 
         _sourceLanguage = LanguageDatabase.FindByCode("auto") ?? Language.Auto;
         _targetLanguage = LanguageDatabase.FindByCode("vi")
@@ -86,11 +101,40 @@ public class MainViewModel : ViewModelBase
         SwapLanguagesCommand = new RelayCommand(SwapLanguages, () => SourceLanguage.Code != "auto");
         CopyResultCommand = new RelayCommand(CopyResult, () => !string.IsNullOrEmpty(TranslatedText));
         ClearCommand = new RelayCommand(Clear);
+        SpeakSourceCommand = new RelayCommand(
+            () => _ = _ttsService?.SpeakAsync(SourceText, SourceLanguage?.Code),
+            () => CanSpeak && !string.IsNullOrWhiteSpace(SourceText));
+        SpeakResultCommand = new RelayCommand(
+            () => _ = _ttsService?.SpeakAsync(TranslatedText, TargetLanguage?.Code),
+            () => CanSpeak && !string.IsNullOrEmpty(TranslatedText));
+        UseHistoryItemCommand = new RelayCommand(UseHistoryItem);
+        ClearHistoryCommand = new RelayCommand(() => _historyService?.Clear());
+    }
+
+    private void UseHistoryItem(object? parameter)
+    {
+        if (parameter is not HistoryItem item) return;
+
+        SourceText = item.SourceText;
+        TranslatedText = item.TranslatedText;
+
+        var src = LanguageDatabase.FindByCode(item.SourceLanguageCode);
+        if (src != null) SourceLanguage = src;
+        var tgt = LanguageDatabase.FindByCode(item.TargetLanguageCode);
+        if (tgt != null) TargetLanguage = tgt;
+
+        StatusText = $"Từ lịch sử: {item.Timestamp:HH:mm dd/MM}";
     }
 
     public async Task TranslateAsync()
     {
         if (string.IsNullOrWhiteSpace(SourceText)) return;
+
+        // Cancel any in-flight translation so a rapid re-trigger does not race.
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
 
         IsTranslating = true;
         StatusText = "Đang dịch...";
@@ -100,7 +144,10 @@ public class MainViewModel : ViewModelBase
         try
         {
             var result = await _translationService.TranslateAsync(
-                SourceText, SourceLanguage.Code, TargetLanguage.Code);
+                SourceText, SourceLanguage.Code, TargetLanguage.Code, token);
+
+            if (token.IsCancellationRequested)
+                return;
 
             if (result.IsSuccess)
             {
@@ -121,6 +168,9 @@ public class MainViewModel : ViewModelBase
 
                 TranslatedText = result.TranslatedText;
 
+                // Record into history (deduped, capped, persisted by the service).
+                _historyService?.Add(result);
+
                 // Update detected language display
                 if (SourceLanguage.Code == "auto" && !string.IsNullOrEmpty(result.DetectedLanguageCode))
                 {
@@ -140,6 +190,11 @@ public class MainViewModel : ViewModelBase
                 StatusText = "Dịch thất bại";
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer request — ignore.
+            return;
+        }
         catch (Exception ex)
         {
             TranslatedText = $"⚠ Lỗi: {ex.Message}";
@@ -147,7 +202,8 @@ public class MainViewModel : ViewModelBase
         }
         finally
         {
-            IsTranslating = false;
+            if (!token.IsCancellationRequested)
+                IsTranslating = false;
         }
     }
 
@@ -182,7 +238,10 @@ public class MainViewModel : ViewModelBase
     private void CopyResult()
     {
         if (!string.IsNullOrEmpty(TranslatedText))
-            System.Windows.Clipboard.SetText(TranslatedText);
+        {
+            try { System.Windows.Clipboard.SetText(TranslatedText); } catch { /* ignore */ }
+            StatusText = "✓ Đã sao chép bản dịch";
+        }
     }
 
     private void Clear()

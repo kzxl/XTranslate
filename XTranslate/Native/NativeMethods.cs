@@ -39,6 +39,16 @@ internal static partial class NativeMethods
         public int Y;
     }
 
+    // --- Clipboard change detection ---
+
+    /// <summary>
+    /// Returns the clipboard sequence number. It increments every time the
+    /// clipboard content changes, letting us detect a Ctrl+C result without
+    /// relying on a fixed delay.
+    /// </summary>
+    [LibraryImport("user32.dll")]
+    public static partial uint GetClipboardSequenceNumber();
+
     // --- Keyboard Input Simulation (for Ctrl+C) ---
 
     [LibraryImport("user32.dll")]
@@ -127,7 +137,7 @@ internal static partial class NativeMethods
 
         if (releaseInputs.Count > 0)
         {
-            Console.WriteLine($"[SendCtrlC] Releasing {releaseInputs.Count} held modifier(s)");
+            Log.Debug($"[SendCtrlC] Releasing {releaseInputs.Count} held modifier(s)");
             SendInput((uint)releaseInputs.Count, releaseInputs.ToArray(), Marshal.SizeOf<INPUT>());
             Thread.Sleep(50);
         }
@@ -142,7 +152,7 @@ internal static partial class NativeMethods
         };
 
         var sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
-        Console.WriteLine($"[SendCtrlC] SendInput returned {sent} (expected 4)");
+        Log.Debug($"[SendCtrlC] SendInput returned {sent} (expected 4)");
     }
 
     private static INPUT MakeKeyInput(ushort vk, uint flags) => new()

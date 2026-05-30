@@ -41,10 +41,12 @@ public partial class SettingsWindow : Window
         chkMinimizeToTray.IsChecked = settings.MinimizeToTray;
         chkStartMinimized.IsChecked = settings.StartMinimized;
         chkShowFloatingIcon.IsChecked = settings.ShowFloatingIcon;
+        chkInstantTranslate.IsChecked = settings.InstantTranslate;
 
         // Engine
         cboEngine.ItemsSource = _engineRegistry.AvailableEngines;
         cboEngine.SelectedItem = _engineRegistry.ActiveEngineName;
+        chkEngineFallback.IsChecked = settings.EnableEngineFallback;
 
         // OCR
         chkOcrEnabled.IsChecked = settings.OcrEnabled;
@@ -54,7 +56,8 @@ public partial class SettingsWindow : Window
             : _ocrEngine.AvailableLanguages.FirstOrDefault();
         txtOcrHotkey.Text = AppOrchestrator.FormatHotkey(settings.OcrHotkey);
 
-        chkStartWithWindows.IsChecked = settings.StartWithWindows;
+        // Reflect the real autostart state from the registry, not just the saved flag.
+        chkStartWithWindows.IsChecked = AutostartService.IsEnabled();
         txtPopupDelay.Text = settings.PopupAutoCloseSeconds.ToString();
     }
 
@@ -126,7 +129,11 @@ public partial class SettingsWindow : Window
         settings.StartMinimized = chkStartMinimized.IsChecked ?? false;
         settings.ShowFloatingIcon = chkShowFloatingIcon.IsChecked ?? true;
         settings.StartWithWindows = chkStartWithWindows.IsChecked ?? false;
+        settings.InstantTranslate = chkInstantTranslate.IsChecked ?? true;
         settings.OcrEnabled = chkOcrEnabled.IsChecked ?? true;
+
+        // Apply autostart change to the Windows Run registry key.
+        AutostartService.SetEnabled(settings.StartWithWindows);
 
         if (cboOcrLang.SelectedItem is string ocrLang)
             settings.OcrLanguage = ocrLang;
@@ -135,6 +142,8 @@ public partial class SettingsWindow : Window
             settings.PopupAutoCloseSeconds = delay;
         if (cboEngine.SelectedItem is string engineName)
             _engineRegistry.ActiveEngineName = engineName;
+
+        settings.EnableEngineFallback = chkEngineFallback.IsChecked ?? true;
 
         _settingsService.Save();
         DialogResult = true;

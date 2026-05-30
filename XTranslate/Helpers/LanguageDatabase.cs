@@ -90,11 +90,15 @@ public static class LanguageDatabase
     public static IReadOnlyList<Language> SourceLanguages => Languages;
 
     /// <summary>
-    /// Languages available as target (excludes Auto).
+    /// Languages available as target (excludes Auto). Built once and cached.
     /// </summary>
-    public static IReadOnlyList<Language> TargetLanguages =>
+    public static IReadOnlyList<Language> TargetLanguages { get; } =
         Languages.Where(l => l.Code != "auto").ToList();
 
+    // Code -> Language lookup, built once for O(1) FindByCode.
+    private static readonly Dictionary<string, Language> ByCode =
+        Languages.ToDictionary(l => l.Code, StringComparer.OrdinalIgnoreCase);
+
     public static Language? FindByCode(string code) =>
-        Languages.FirstOrDefault(l => l.Code.Equals(code, StringComparison.OrdinalIgnoreCase));
+        !string.IsNullOrEmpty(code) && ByCode.TryGetValue(code, out var lang) ? lang : null;
 }

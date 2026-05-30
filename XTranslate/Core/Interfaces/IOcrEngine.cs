@@ -10,7 +10,7 @@ public interface IOcrEngine
     /// <summary>
     /// Recognize text from a bitmap image.
     /// </summary>
-    Task<string> RecognizeAsync(BitmapSource image, string? languageTag = null);
+    Task<string> RecognizeAsync(BitmapSource image, string? languageTag = null, CancellationToken ct = default);
 
     /// <summary>
     /// List of available OCR language tags on this system.

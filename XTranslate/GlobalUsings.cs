@@ -1,4 +1,5 @@
 // Global using directives to resolve WPF vs WinForms ambiguity
+global using XTranslate.Helpers;
 global using Application = System.Windows.Application;
 global using MessageBox = System.Windows.MessageBox;
 global using MessageBoxButton = System.Windows.MessageBoxButton;
