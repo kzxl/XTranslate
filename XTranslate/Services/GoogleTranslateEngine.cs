@@ -15,14 +15,7 @@ public class GoogleTranslateEngine : ITranslationEngine
     public string Name => "Google Translate";
     public IReadOnlyList<Language> SupportedLanguages => LanguageDatabase.Languages;
 
-    private readonly HttpClient _httpClient;
-
-    public GoogleTranslateEngine()
-    {
-        _httpClient = new HttpClient();
-        _httpClient.DefaultRequestHeaders.Add("User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-    }
+    private readonly HttpClient _httpClient = HttpClientProvider.Shared;
 
     public async Task<TranslationResult> TranslateAsync(
         string text, string sourceLang, string targetLang, CancellationToken ct = default)

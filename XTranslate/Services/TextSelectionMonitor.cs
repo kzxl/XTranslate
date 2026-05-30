@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
+using XTranslate.Helpers;
 using XTranslate.Native;
 
 namespace XTranslate.Services;
@@ -44,7 +45,7 @@ public class TextSelectionMonitor : IDisposable
 
         _mouseProc = MouseHookCallback;
         _mouseHookId = SetMouseHook(_mouseProc);
-        Console.WriteLine($"[XTranslate] TextSelectionMonitor started. Hook={_mouseHookId}");
+        Log.Debug($"TextSelectionMonitor started. Hook={_mouseHookId}");
     }
 
     public void Stop()
@@ -109,7 +110,7 @@ public class TextSelectionMonitor : IDisposable
 
         if (NativeMethods.GetCursorPos(out var point))
         {
-            Console.WriteLine($"[XTranslate] Possible selection at ({point.X}, {point.Y})");
+            Log.Debug($"Possible selection at ({point.X}, {point.Y})");
             PossibleSelection?.Invoke(point.X, point.Y);
         }
     }

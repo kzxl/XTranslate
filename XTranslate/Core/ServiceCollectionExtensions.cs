@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IHotkeyService, HotkeyService>();
         services.AddSingleton<IClipboardService, ClipboardService>();
         services.AddSingleton<TextSelectionMonitor>();
+        services.AddSingleton<HistoryService>();
 
         // --- Translation Engine Registry ---
         services.AddSingleton<TranslationEngineRegistry>(sp =>
@@ -25,6 +26,7 @@ public static class ServiceCollectionExtensions
             var registry = new TranslationEngineRegistry();
             registry.Register(new GoogleTranslateEngine());
             registry.Register(new MyMemoryTranslateEngine());
+            registry.Register(new LingvaTranslateEngine());
             return registry;
         });
         services.AddSingleton<TranslationService>();
@@ -32,6 +34,9 @@ public static class ServiceCollectionExtensions
         // --- OCR ---
         services.AddSingleton<IOcrEngine, WindowsOcrEngine>();
         services.AddSingleton<ScreenCaptureService>();
+
+        // --- Text-to-Speech ---
+        services.AddSingleton<ITtsService, WindowsTtsService>();
 
         // --- ViewModels ---
         services.AddSingleton<MainViewModel>();

@@ -1,11 +1,11 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.InteropServices.WindowsRuntime;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
-using Windows.Storage.Streams;
 using XTranslate.Core.Interfaces;
-using WinBitmapDecoder = Windows.Graphics.Imaging.BitmapDecoder;
 
 namespace XTranslate.Services;
 
@@ -15,6 +15,10 @@ namespace XTranslate.Services;
 /// </summary>
 public class WindowsOcrEngine : IOcrEngine
 {
+    // Cache OcrEngine instances per language tag. Creating one is relatively
+    // expensive and the instances are reusable across recognitions.
+    private readonly ConcurrentDictionary<string, OcrEngine?> _engineCache = new();
+
     public bool IsAvailable => OcrEngine.AvailableRecognizerLanguages.Count > 0;
 
     public IReadOnlyList<string> AvailableLanguages =>
@@ -22,28 +26,28 @@ public class WindowsOcrEngine : IOcrEngine
             .Select(l => l.LanguageTag)
             .ToList();
 
-    public async Task<string> RecognizeAsync(BitmapSource image, string? languageTag = null)
+    public async Task<string> RecognizeAsync(BitmapSource image, string? languageTag = null, CancellationToken ct = default)
     {
         try
         {
-            OcrEngine? engine = null;
-            if (!string.IsNullOrEmpty(languageTag))
-            {
-                var lang = new Windows.Globalization.Language(languageTag);
-                if (OcrEngine.IsLanguageSupported(lang))
-                    engine = OcrEngine.TryCreateFromLanguage(lang);
-            }
-            engine ??= OcrEngine.TryCreateFromUserProfileLanguages();
+            ct.ThrowIfCancellationRequested();
 
+            var engine = GetEngine(languageTag);
             if (engine == null)
             {
                 Debug.WriteLine("[OCR] No OCR engine available.");
                 return "";
             }
 
-            var softwareBitmap = await ConvertToSoftwareBitmap(image);
-            var result = await engine.RecognizeAsync(softwareBitmap);
+            var softwareBitmap = ConvertToSoftwareBitmap(image);
+            ct.ThrowIfCancellationRequested();
+
+            var result = await engine.RecognizeAsync(softwareBitmap).AsTask(ct);
             return result.Text;
+        }
+        catch (OperationCanceledException)
+        {
+            return "";
         }
         catch (Exception ex)
         {
@@ -52,26 +56,48 @@ public class WindowsOcrEngine : IOcrEngine
         }
     }
 
-    private static async Task<SoftwareBitmap> ConvertToSoftwareBitmap(BitmapSource source)
+    private OcrEngine? GetEngine(string? languageTag)
     {
-        // Encode WPF BitmapSource to PNG in memory
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(source));
+        // Key the cache by the requested tag (empty string = user profile default).
+        var key = languageTag ?? "";
+        return _engineCache.GetOrAdd(key, static k =>
+        {
+            if (!string.IsNullOrEmpty(k))
+            {
+                var lang = new Windows.Globalization.Language(k);
+                if (OcrEngine.IsLanguageSupported(lang))
+                {
+                    var fromLang = OcrEngine.TryCreateFromLanguage(lang);
+                    if (fromLang != null)
+                        return fromLang;
+                }
+            }
+            return OcrEngine.TryCreateFromUserProfileLanguages();
+        });
+    }
 
-        using var memoryStream = new System.IO.MemoryStream();
-        encoder.Save(memoryStream);
-        var bytes = memoryStream.ToArray();
+    /// <summary>
+    /// Converts a WPF BitmapSource straight to a Bgra8 SoftwareBitmap via its
+    /// pixel buffer. This avoids the previous PNG encode-to-memory then
+    /// decode-back round-trip, cutting allocations and time noticeably.
+    /// </summary>
+    private static SoftwareBitmap ConvertToSoftwareBitmap(BitmapSource source)
+    {
+        // Ensure the pixel format is BGRA8 (what SoftwareBitmap expects below).
+        BitmapSource bgra = source.Format == PixelFormats.Bgra32
+            ? source
+            : new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
 
-        // Create IRandomAccessStream from bytes
-        var randomAccessStream = new InMemoryRandomAccessStream();
-        await randomAccessStream.WriteAsync(bytes.AsBuffer());
-        randomAccessStream.Seek(0);
+        int width = bgra.PixelWidth;
+        int height = bgra.PixelHeight;
+        int stride = width * 4;
+        var pixels = new byte[stride * height];
+        bgra.CopyPixels(pixels, stride, 0);
 
-        // Decode to SoftwareBitmap
-        var decoder = await WinBitmapDecoder.CreateAsync(randomAccessStream);
-        var bitmap = await decoder.GetSoftwareBitmapAsync(
-            BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
-
-        return bitmap;
+        return SoftwareBitmap.CreateCopyFromBuffer(
+            pixels.AsBuffer(),
+            BitmapPixelFormat.Bgra8,
+            width, height,
+            BitmapAlphaMode.Premultiplied);
     }
 }
